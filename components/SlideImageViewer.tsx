@@ -72,19 +72,20 @@ export function SlideImageViewer({
                 onContextMenu={(e) => e.preventDefault()}
               />
 
-              {/* 制限ページ用オーバーレイ */}
+              {/* 制限ページ用オーバーレイ（4枚目以降の案内。透かしつつ案内文は濃い色で読みやすく） */}
               {isRestricted && (
                 <div
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-white/70"
+                  className="absolute inset-0 flex flex-col items-center justify-center rounded-lg"
+                  style={{ background: "rgba(255, 255, 255, 0.68)" }}
                   aria-hidden
                 >
-                  <p className="mb-4 max-w-sm text-center text-sm" style={{ color: "var(--fg)" }}>
+                  <p className="mb-4 max-w-sm text-center text-sm font-medium text-neutral-900 drop-shadow-sm">
                     このスライドの全{pageCount}
                     ページを閲覧するにはログインが必要です。ログイン後、招待コードを入力すると全ページ閲覧できます。
                   </p>
                   <Link
                     href="/login"
-                    className="rounded-lg px-6 py-3 text-sm font-medium transition-colors"
+                    className="rounded-lg px-6 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
                     style={{
                       background: "var(--btn-primary-bg)",
                       color: "var(--btn-primary-fg)",

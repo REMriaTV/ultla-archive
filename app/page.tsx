@@ -33,7 +33,6 @@ export default async function Home(props: HomeProps) {
   const accessCtx = await getAccessContext(supabase, supabaseAdmin ?? null);
 
   const DEFAULT_SUBTITLE = "いつでも、どこでも、学びのレシピ";
-  const DEFAULT_FOOTER = "SPACE ARCHIVE — いつでも、どこでも、学びのレシピ";
 
   const [
     { data: programs, error: programsError },
@@ -47,11 +46,16 @@ export default async function Home(props: HomeProps) {
     accessCtx.isAdmin && supabaseAdmin
       ? supabaseAdmin.from("slides").select("*")
       : supabase.from("slides").select("*"),
-    supabase.from("site_settings").select("subtitle, footer_text").eq("id", "main").single(),
+    supabase.from("site_settings").select("subtitle, hero_mode, hero_slide_count, hero_slide_ids").eq("id", "main").single(),
   ]);
 
   const subtitle = typeof siteSettings?.subtitle === "string" ? siteSettings.subtitle : DEFAULT_SUBTITLE;
-  const footerText = typeof siteSettings?.footer_text === "string" ? siteSettings.footer_text : DEFAULT_FOOTER;
+  const heroMode = siteSettings?.hero_mode === "selected" ? "selected" : "random";
+  const heroSlideCount = typeof siteSettings?.hero_slide_count === "number" && siteSettings.hero_slide_count >= 1 && siteSettings.hero_slide_count <= 20
+    ? siteSettings.hero_slide_count
+    : 5;
+  const heroSlideIdsRaw = siteSettings?.hero_slide_ids;
+  const heroSlideIds = Array.isArray(heroSlideIdsRaw) ? heroSlideIdsRaw.filter((id: unknown) => typeof id === "string") : [];
 
   if (programsError) console.error("Programs fetch error:", programsError);
   if (slidesError) console.error("Slides fetch error:", slidesError);
@@ -63,7 +67,11 @@ export default async function Home(props: HomeProps) {
   const rawSlides = (allSlides ?? []) as Slide[];
   const slidesList = filterVisibleSlides(rawSlides, accessCtx);
 
-  const heroSlides = shuffle(slidesList).slice(0, 5);
+  const slidesById = new Map(slidesList.map((s) => [String(s.id), s]));
+  const heroSlides =
+    heroMode === "selected" && heroSlideIds.length > 0
+      ? heroSlideIds.map((id) => slidesById.get(id)).filter(Boolean) as Slide[]
+      : shuffle(slidesList).slice(0, heroSlideCount);
 
   const slidesByProgram = new Map<string, Slide[]>();
   for (const slide of slidesList) {
@@ -129,9 +137,10 @@ export default async function Home(props: HomeProps) {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
+    <div className="flex min-h-screen w-full flex-col" style={{ background: "var(--bg)" }}>
+      {/* 「SPACE ARCHIVE」ヘッダーはメインエリア幅いっぱいに表示（中途半端に切れないように） */}
       <header
-        className="border-b"
+        className="w-full shrink-0 border-b"
         style={{ borderColor: "var(--border)", background: "var(--card)" }}
       >
         <div className="mx-auto max-w-4xl px-6 py-4">
@@ -147,7 +156,8 @@ export default async function Home(props: HomeProps) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 py-6">
+      <div className="mx-auto w-full max-w-4xl flex-1 min-w-0">
+      <main className="px-6 py-6">
         <GuestBanner />
         {/* ヒーロースライド（main の px を打ち消して幅いっぱいに） */}
         <section className="-mx-6 mb-6">
@@ -223,19 +233,7 @@ export default async function Home(props: HomeProps) {
           </section>
         </ExpandedSlideProvider>
       </main>
-
-      <footer className="mt-24 border-t py-8" style={{ borderColor: "var(--border)" }}>
-        <div
-          className="mx-auto max-w-4xl px-6 text-center text-sm"
-          style={{ color: "var(--fg-muted)" }}
-        >
-          {footerText}
-          <span className="mx-2">|</span>
-          <Link href="/admin" className="hover:opacity-80">
-            管理
-          </Link>
-        </div>
-      </footer>
+      </div>
     </div>
   );
 }

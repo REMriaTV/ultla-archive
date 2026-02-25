@@ -8,12 +8,17 @@ import { MypageSidebar } from "@/components/MypageSidebar";
  */
 export function LoggedInSidebarLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen" style={{ background: "var(--bg)" }}>
+    <div className="flex min-h-screen w-full" style={{ background: "var(--bg)" }}>
       {/* ヘッダー下に揃えて固定（sticky）。ヘッダー高さ程度の top で重ならないようにする */}
       <div className="sticky top-14 hidden h-screen shrink-0 self-start md:block">
         <MypageSidebar />
       </div>
-      <div className="min-w-0 flex-1">{children}</div>
+      <div
+        className="min-w-0 flex-1 flex w-full justify-center"
+        style={{ background: "var(--bg)" }}
+      >
+        {children}
+      </div>
     </div>
   );
 }

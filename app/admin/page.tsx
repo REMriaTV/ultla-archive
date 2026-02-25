@@ -112,6 +112,9 @@ export default function AdminPage() {
 
   const [siteSettingsSubtitle, setSiteSettingsSubtitle] = useState("");
   const [siteSettingsFooterText, setSiteSettingsFooterText] = useState("");
+  const [heroMode, setHeroMode] = useState<"random" | "selected">("random");
+  const [heroSlideCount, setHeroSlideCount] = useState(5);
+  const [heroSlideIds, setHeroSlideIds] = useState<string[]>([]);
   const [savingSiteSettings, setSavingSiteSettings] = useState(false);
 
   useEffect(() => {
@@ -129,6 +132,9 @@ export default function AdminPage() {
       const data = await res.json();
       setSiteSettingsSubtitle(data.subtitle ?? "");
       setSiteSettingsFooterText(data.footer_text ?? "");
+      setHeroMode(data.hero_mode === "selected" ? "selected" : "random");
+      setHeroSlideCount(typeof data.hero_slide_count === "number" ? data.hero_slide_count : 5);
+      setHeroSlideIds(Array.isArray(data.hero_slide_ids) ? data.hero_slide_ids : []);
     } catch {
       console.error("サイト設定読み込み失敗");
     }
@@ -144,6 +150,9 @@ export default function AdminPage() {
         body: JSON.stringify({
           subtitle: siteSettingsSubtitle,
           footer_text: siteSettingsFooterText,
+          hero_mode: heroMode,
+          hero_slide_count: heroSlideCount,
+          hero_slide_ids: heroSlideIds,
         }),
       });
       if (!res.ok) {
@@ -617,30 +626,38 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto max-w-4xl px-6 py-6">
-          <div className="flex items-center justify-between">
+    <div className="min-h-screen w-full">
+      <header
+        className="w-full min-w-0 overflow-visible border-b"
+        style={{ borderColor: "var(--border)", background: "var(--bg-header)" }}
+      >
+        <div className="mx-auto w-full min-w-0 max-w-4xl px-6 py-6">
+          <div className="flex min-w-0 items-center justify-between gap-4">
             <Link
               href="/"
-              className="text-sm font-medium text-neutral-600 hover:text-neutral-900"
+              className="shrink-0 text-sm font-medium hover:opacity-80"
+              style={{ color: "var(--fg-muted)" }}
             >
               ← Back to Home
             </Link>
-            <div className="flex items-center gap-4">
+            <div className="flex min-w-0 shrink-0 items-center gap-4">
               <Link
                 href="/admin/guide"
-                className="text-sm text-neutral-600 hover:text-neutral-900"
+                className="shrink-0 text-sm hover:opacity-80"
+                style={{ color: "var(--fg-muted)" }}
               >
                 使い方ガイド
               </Link>
-              <h1 className="text-xl font-bold text-neutral-900">管理画面</h1>
+              <h1 className="shrink-0 text-xl font-bold" style={{ color: "var(--fg)" }}>
+                管理画面
+              </h1>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 py-8">
+      <main className="min-h-screen w-full bg-white">
+        <div className="mx-auto max-w-4xl px-6 py-8">
         {/* サイト設定（サブタイトル・フッター文言） */}
         <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
           <h2 className="mb-4 text-lg font-semibold text-neutral-800">サイト設定</h2>
@@ -667,6 +684,90 @@ export default function AdminPage() {
                 placeholder="例: SPACE ARCHIVE — いつでも、どこでも、学びのレシピ"
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
               />
+            </div>
+            <div className="space-y-4 border-t border-neutral-200 pt-4">
+              <h3 className="text-sm font-semibold text-neutral-800">ヒーローカルーセル（トップのスライド表示）</h3>
+              <div className="flex flex-wrap gap-6">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="heroMode"
+                    checked={heroMode === "random"}
+                    onChange={() => setHeroMode("random")}
+                    className="rounded border-neutral-300"
+                  />
+                  <span className="text-sm text-neutral-700">ランダムモード</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="heroMode"
+                    checked={heroMode === "selected"}
+                    onChange={() => setHeroMode("selected")}
+                    className="rounded border-neutral-300"
+                  />
+                  <span className="text-sm text-neutral-700">選択モード</span>
+                </label>
+              </div>
+              {heroMode === "random" && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-neutral-700">表示枚数（1〜20）</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={heroSlideCount}
+                    onChange={(e) => setHeroSlideCount(Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1)))}
+                    className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+                  />
+                </div>
+              )}
+              {heroMode === "selected" && (
+                <div>
+                  <p className="mb-2 text-sm text-neutral-600">表示するスライドを選んでください（上から表示順）。</p>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        if (id && !heroSlideIds.includes(id)) setHeroSlideIds((prev) => [...prev, id]);
+                        e.target.value = "";
+                      }}
+                      className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"
+                    >
+                      <option value="">スライドを追加…</option>
+                      {slides
+                        .filter((s) => !heroSlideIds.includes(s.id))
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.title} ({String(s.id ?? "").slice(0, 8)}…)
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <ul className="space-y-1 rounded border border-neutral-200 bg-neutral-50 p-2 max-h-48 overflow-y-auto">
+                    {heroSlideIds.length === 0 ? (
+                      <li className="text-sm text-neutral-500">まだ選択されていません</li>
+                    ) : (
+                      heroSlideIds.map((id) => {
+                        const slide = slides.find((s) => s.id === id);
+                        return (
+                          <li key={id} className="flex items-center justify-between gap-2 rounded px-2 py-1 text-sm">
+                            <span className="min-w-0 truncate text-neutral-800">{slide?.title ?? id}</span>
+                            <button
+                              type="button"
+                              onClick={() => setHeroSlideIds((prev) => prev.filter((x) => x !== id))}
+                              className="shrink-0 rounded border border-neutral-300 bg-white px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100"
+                            >
+                              削除
+                            </button>
+                          </li>
+                        );
+                      })
+                    )}
+                  </ul>
+                </div>
+              )}
             </div>
             <button
               type="submit"
@@ -1753,6 +1854,7 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+        </div>
       </main>
     </div>
   );

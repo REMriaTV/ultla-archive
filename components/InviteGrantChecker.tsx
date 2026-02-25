@@ -18,6 +18,12 @@ export function InviteGrantChecker() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || cancelled) return;
 
+      // Google OAuth 直後のリダイレクト: クライアントでセッションが確定したらサーバーを再描画
+      if (typeof window !== "undefined" && window.location.hash) {
+        router.refresh();
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("access_granted")

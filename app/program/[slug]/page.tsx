@@ -16,14 +16,26 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 export default async function ProgramPage({ params }: ProgramPageProps) {
   const { slug: slugParam } = await params;
   const supabase = await createClient();
-  const slugOrId = typeof slugParam === "string" ? slugParam : "";
+  const slugOrId = typeof slugParam === "string" ? decodeURIComponent(slugParam) : "";
 
   const isId = UUID_REGEX.test(slugOrId);
-  const { data: program, error: programError } = await supabase
-    .from("programs")
-    .select("*")
-    .match(isId ? { id: slugOrId } : { slug: slugOrId })
-    .single();
+  let program: { id: string; name: string; slug: string | null; description?: string | null } | null = null;
+  let programError: Error | null = null;
+
+  if (isId) {
+    const r = await supabase.from("programs").select("*").eq("id", slugOrId).single();
+    program = r.data;
+    programError = r.error;
+  } else {
+    const r = await supabase.from("programs").select("*").eq("slug", slugOrId).single();
+    if (r.data) {
+      program = r.data;
+    } else {
+      const fallback = await supabase.from("programs").select("*").ilike("slug", slugOrId).limit(1).single();
+      program = fallback.data;
+      programError = fallback.error;
+    }
+  }
 
   if (programError || !program) {
     return notFound();
@@ -44,7 +56,7 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
   const visibleSlides = filterVisibleSlides((slidesData ?? []) as Slide[], accessCtx);
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
+    <main className="w-full min-w-0 mx-auto max-w-4xl px-4 py-6 sm:px-6">
       <header className="mb-8">
         <p className="mb-1 text-xs font-medium uppercase tracking-wider" style={{ color: "var(--fg-muted)" }}>
           シリーズ
@@ -73,7 +85,7 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
           このシリーズの公開スライドはまだありません。
         </p>
       ) : (
-        <section className="space-y-3 md:space-y-4">
+        <section className="w-full min-w-0 space-y-3 md:space-y-4">
           {visibleSlides.map((slide) => {
             const thumb = slide.image_url ?? slide.page_image_urls?.[0];
             const caption = slide.caption?.trim() || null;
@@ -90,34 +102,32 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
               <Link
                 key={slide.id}
                 href={`/slide/${slide.id}`}
-                className="flex min-h-[90px] gap-4 overflow-hidden rounded-lg border transition-[box-shadow,transform] duration-300 ease-out hover:scale-[1.01] hover:shadow-[0_12px_40px_rgba(0,0,0,0.22),0_0_0_2px_rgba(255,255,255,0.25),0_0_40px_rgba(255,255,255,0.15)] active:scale-[0.99] sm:min-h-0 sm:gap-5"
+                className="flex min-h-[90px] w-full min-w-0 gap-4 overflow-hidden rounded-lg border transition-[box-shadow,transform] duration-300 ease-out hover:scale-[1.01] hover:shadow-[0_12px_40px_rgba(0,0,0,0.22),0_0_0_2px_rgba(255,255,255,0.25),0_0_40px_rgba(255,255,255,0.15)] active:scale-[0.99] sm:min-h-0 sm:gap-5"
                 style={{
                   borderColor: "var(--border)",
                   background: "var(--card)",
                 }}
               >
-                {/* サムネイル：左・16:9。カード高さ＝サムネイルに合わせる（モバイル） */}
-                <div className="relative flex w-40 shrink-0 items-stretch overflow-hidden sm:w-48 md:w-56">
-                  <div className="relative w-full overflow-hidden" style={{ paddingBottom: "56.25%" }}>
-                    {thumb ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={thumb}
-                        alt={slide.title}
-                        className="absolute inset-0 h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div
-                        className="absolute inset-0 flex items-center justify-center"
-                        style={{ background: "var(--card-hover)" }}
-                      >
-                        <span className="text-xs" style={{ color: "var(--fg-muted)" }}>
-                          画像なし
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                {/* サムネイル：左・16:9。aspect-video で高さを確保し確実に表示 */}
+                <div className="relative w-44 shrink-0 overflow-hidden rounded-l-lg sm:w-52 md:w-64 aspect-video">
+                  {thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={thumb}
+                      alt={slide.title}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div
+                      className="flex h-full w-full items-center justify-center"
+                      style={{ background: "var(--card-hover)" }}
+                    >
+                      <span className="text-xs" style={{ color: "var(--fg-muted)" }}>
+                        画像なし
+                      </span>
+                    </div>
+                  )}
                 </div>
                 {/* テキスト：右。▼タイトル/キャプションの開始位置：pt-3 を pt-2/pt-4/pt-5 等に変更で上下可（モバイル） */}
                 <div className="flex min-h-0 flex-1 flex-col justify-start overflow-hidden pt-2 pb-2 pr-3 sm:justify-center sm:gap-1.5 sm:py-5 sm:pr-5">

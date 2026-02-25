@@ -238,7 +238,7 @@ export function MylistShelf({ slides, programs, className = "" }: MylistShelfPro
       </div>
       <div style={{ overflow: "visible" }}>
         <div
-          className="flex items-start gap-4 px-1 snap-x snap-mandatory"
+          className="scrollbar-hide flex items-start gap-4 px-1 snap-x snap-mandatory"
           style={{
             overflowX: "auto",
             overflowY: "hidden",
@@ -300,7 +300,7 @@ export function InviteSeriesShelf({ id, codeName, codeSlug, slides, programs }: 
       </div>
       <div style={{ overflow: "visible" }}>
         <div
-          className="flex items-start gap-4 px-1 snap-x snap-mandatory"
+          className="scrollbar-hide flex items-start gap-4 px-1 snap-x snap-mandatory"
           style={{
             overflowX: "auto",
             overflowY: "hidden",
@@ -363,7 +363,7 @@ export function ProgramShelf({ program, slides }: ProgramShelfProps) {
       {/* 棚の高さをサムネイルに合わせ、縦スクロールバーを出さない（Safari で min-content が効かないため具体的な最小高さを指定） */}
       <div style={{ overflow: "visible" }}>
         <div
-          className="flex items-start gap-4 px-1 snap-x snap-mandatory"
+          className="scrollbar-hide flex items-start gap-4 px-1 snap-x snap-mandatory"
           style={{
             overflowX: "auto",
             overflowY: "hidden",

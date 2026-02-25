@@ -34,6 +34,24 @@ function MobileSidebar({ onClose }: MobileSidebarProps) {
   const [genreTypes, setGenreTypes] = useState<GenreTypeRow[]>([]);
   const [openMypage, setOpenMypage] = useState(true);
   const [openGenre, setOpenGenre] = useState<Record<string, boolean>>({});
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/mypage/profile")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setIsAdmin(data?.is_admin === true))
+      .catch(() => setIsAdmin(false));
+  }, [pathname]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      fetch("/api/mypage/profile")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => setIsAdmin((prev) => (data?.is_admin === true ? true : prev)))
+        .catch(() => {});
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [pathname]);
 
   useEffect(() => {
     fetch("/api/programs")
@@ -156,6 +174,21 @@ function MobileSidebar({ onClose }: MobileSidebarProps) {
                   {label}
                 </Link>
               ))}
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  onClick={onClose}
+                  className="block rounded-lg px-3 py-2 text-sm hover:bg-white/5"
+                  style={{
+                    color:
+                      pathname.startsWith("/admin") ? "var(--fg)" : "var(--fg-muted)",
+                    background:
+                      pathname.startsWith("/admin") ? "var(--card-hover)" : "transparent",
+                  }}
+                >
+                  管理
+                </Link>
+              )}
             </div>
           )}
         </div>

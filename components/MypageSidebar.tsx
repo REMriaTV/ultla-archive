@@ -28,6 +28,25 @@ export function MypageSidebar() {
   const pathname = usePathname();
   const [programs, setPrograms] = useState<SidebarProgram[]>([]);
   const [genreTypes, setGenreTypes] = useState<GenreTypeRow[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/mypage/profile")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setIsAdmin(data?.is_admin === true))
+      .catch(() => setIsAdmin(false));
+  }, [pathname]);
+
+  // ログイン直後は pathname だけでは refetch が走らないことがあるため、マウント後少し遅れて再取得
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      fetch("/api/mypage/profile")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => setIsAdmin((prev) => (data?.is_admin === true ? true : prev)))
+        .catch(() => {});
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [pathname]);
 
   useEffect(() => {
     fetch("/api/programs")
@@ -114,6 +133,19 @@ export function MypageSidebar() {
                 {label}
               </Link>
             ))}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="block rounded-lg px-3 py-2 pl-4 text-sm transition-colors hover:opacity-90 cursor-pointer"
+                style={{
+                  color: pathname.startsWith("/admin") ? "var(--fg)" : "var(--fg-muted)",
+                  background:
+                    pathname.startsWith("/admin") ? "var(--card-hover)" : "transparent",
+                }}
+              >
+                管理
+              </Link>
+            )}
           </div>
         </nav>
 
@@ -134,8 +166,8 @@ export function MypageSidebar() {
                     {list.map((p) => (
                       <Link
                         key={p.id}
-                        href={`/program/${p.slug || p.id}`}
-                        className="block rounded-lg px-3 py-2 pl-4 text-sm transition-colors hover:opacity-90"
+                        href={`/program/${encodeURIComponent(p.slug || p.id)}`}
+                        className="block rounded-lg px-3 py-2 pl-4 text-base font-normal leading-normal transition-colors hover:opacity-90"
                         style={{ color: "var(--fg-muted)" }}
                       >
                         {p.name}

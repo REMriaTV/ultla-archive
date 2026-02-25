@@ -96,6 +96,11 @@ html[data-theme="blue-orange"] {
   --font-mono: var(--font-geist-mono);
 }
 
+html,
+body {
+  overflow-x: visible;
+}
+
 body {
   background: var(--bg);
   color: var(--fg);
@@ -176,6 +181,15 @@ input::placeholder {
   .program-shelf-thumb {
     width: clamp(180px, 27vw, 230px);
   }
+}
+
+/* シリーズ棚の横スクロールバーを非表示（スクロールは可能） */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 /* ===== ダウンロード・印刷制限（スライドコンテンツ保護） ===== */

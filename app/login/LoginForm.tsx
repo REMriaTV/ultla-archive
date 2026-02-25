@@ -104,7 +104,7 @@ export function LoginForm() {
         }
         setMessage({
           type: "success",
-          text: "確認メールを送信しました。メール内のリンクをクリックして登録を完了してください。",
+          text: "確認メールを送信しました。届いたメールに「Confirm your mail」というリンクがあります。それをクリックすると登録が完了します。",
         });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -123,43 +123,50 @@ export function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-8 shadow-sm">
-        <h1 className="text-xl font-bold text-neutral-900">
-          {mode === "login" ? "ログイン" : "無料会員登録"}
+    <div className="min-h-screen w-full bg-white">
+      <div className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-6">
+        <Link
+          href="/"
+          className="mb-4 text-sm font-medium text-neutral-600 underline underline-offset-2 hover:text-neutral-900"
+        >
+          ゲストのまま閲覧する
+        </Link>
+        <div className="mx-auto w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
+        <h1 className="text-lg font-bold text-neutral-900">
+          {mode === "login" ? "ログイン" : "会員登録"}
         </h1>
-        <p className="mt-2 text-sm text-neutral-600">
+        <p className="mt-2 text-sm text-neutral-600 leading-snug">
           {mode === "login"
             ? "登録済みの方はメールアドレスとパスワードでログイン"
-            : "メールアドレスで無料会員登録（全スライド閲覧可能）"}
+            : "メールアドレスで会員登録"}
         </p>
 
         {mode === "signup" && (
-          <div className="mt-6">
+          <div className="mt-4">
             <label htmlFor="invite" className="block text-sm font-medium text-neutral-700">
-              招待コード（任意）
+              招待コード（あれば）
             </label>
             <input
               id="invite"
               type="text"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value)}
-              placeholder="お持ちの場合は入力（登録後マイページからも追加できます）"
-              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+              placeholder="あれば入力"
+              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
             />
           </div>
         )}
 
-        <p className="mt-4 text-xs text-neutral-500 leading-relaxed">
+        <p className="mt-4 text-xs text-neutral-500 leading-snug">
           「Google でログイン」を押すと、セキュリティのため認証サービスの画面が表示されます。「supabase.co」という長いアドレスが出ても問題ありません。安全なログイン処理の一環です。
         </p>
         <button
           type="button"
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-3 font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
         >
-          <svg className="h-5 w-5" viewBox="0 0 24 24">
+          <svg className="h-4 w-4" viewBox="0 0 24 24">
             <path
               fill="#4285F4"
               d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -180,13 +187,13 @@ export function LoginForm() {
           Google でログイン
         </button>
 
-        <div className="mt-6 flex items-center gap-4">
+        <div className="mt-4 flex items-center gap-3">
           <div className="h-px flex-1 bg-neutral-200" />
           <span className="text-xs text-neutral-500">または</span>
           <div className="h-px flex-1 bg-neutral-200" />
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-neutral-700">
               メールアドレス
@@ -198,7 +205,7 @@ export function LoginForm() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
             />
           </div>
           <div>
@@ -213,7 +220,7 @@ export function LoginForm() {
               required
               minLength={6}
               autoComplete={mode === "login" ? "current-password" : "new-password"}
-              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+              className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
             />
             {mode === "signup" && (
               <p className="mt-1 text-xs text-neutral-500">6文字以上</p>
@@ -221,7 +228,7 @@ export function LoginForm() {
           </div>
           {message && (
             <p
-              className={`text-sm ${
+              className={`text-sm leading-snug ${
                 message.type === "success" ? "text-green-600" : "text-red-600"
               }`}
             >
@@ -231,7 +238,7 @@ export function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-neutral-900 px-4 py-3 font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+            className="w-full rounded-lg bg-neutral-900 px-3 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
           >
             {loading ? "処理中..." : mode === "login" ? "ログイン" : "登録"}
           </button>
@@ -246,16 +253,10 @@ export function LoginForm() {
           }}
           className="mt-4 w-full text-center text-sm text-neutral-600 hover:text-neutral-900"
         >
-          {mode === "login" ? "アカウントをお持ちでない方 → 無料登録" : "既に登録済みの方 → ログイン"}
+          {mode === "login" ? "アカウントをお持ちでない方 → 登録" : "既に登録済みの方 → ログイン"}
         </button>
       </div>
-
-      <Link
-        href="/"
-        className="mt-6 text-sm text-neutral-500 hover:text-neutral-700"
-      >
-        ゲストのまま閲覧する
-      </Link>
+      </div>
     </div>
   );
 }

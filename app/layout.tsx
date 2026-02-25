@@ -7,6 +7,7 @@ import { HeaderSearch } from "@/components/HeaderSearch";
 import { InviteGrantChecker } from "@/components/InviteGrantChecker";
 import { LoggedInSidebarLayout } from "@/components/LoggedInSidebarLayout";
 import { MobileSidebarMenu } from "@/components/MobileSidebarMenu";
+import { SiteFooter } from "@/components/SiteFooter";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -56,27 +57,39 @@ export default async function RootLayout({
       >
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <header
-          className="sticky top-0 z-50 border-b backdrop-blur"
+          className="sticky top-0 z-50 w-full min-w-0 overflow-visible border-b backdrop-blur"
           style={{
             borderColor: "var(--border)",
             background: "var(--bg-header)",
+            width: "100%",
           }}
         >
-          <div className="header-inner mx-auto flex max-w-4xl items-center justify-between gap-2 px-4 py-2.5 sm:gap-4 sm:px-6 sm:py-3">
-            <div className="flex items-center gap-2">
-              <MobileSidebarMenu />
-              <Link href="/" className="shrink-0 text-sm font-medium">
-                トップ
-              </Link>
-            </div>
-            <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-4">
-              <HeaderSearch />
-              <AuthHeader />
+          {/* メインコンテンツと幅を揃える: デスクトップではサイドバー幅のスペーサー + 中央 max-w-4xl */}
+          <div className="flex w-full">
+            <div className="hidden w-56 shrink-0 md:block" aria-hidden />
+            <div className="min-w-0 flex-1 flex justify-center">
+              <div className="header-inner flex w-full max-w-4xl min-w-0 items-center justify-between gap-2 overflow-visible px-4 py-2.5 sm:gap-4 sm:px-6 sm:py-3">
+                <div className="flex items-center gap-2">
+                  <MobileSidebarMenu />
+                  <Link href="/" className="shrink-0 text-sm font-medium">
+                    トップ
+                  </Link>
+                </div>
+                <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-4">
+                  <HeaderSearch />
+                  <AuthHeader />
+                </div>
+              </div>
             </div>
           </div>
         </header>
         <InviteGrantChecker />
-        <LoggedInSidebarLayout>{children}</LoggedInSidebarLayout>
+        <div className="flex min-h-screen flex-col">
+          <div className="min-h-0 flex-1 flex">
+            <LoggedInSidebarLayout>{children}</LoggedInSidebarLayout>
+          </div>
+          <SiteFooter />
+        </div>
       </body>
     </html>
   );
