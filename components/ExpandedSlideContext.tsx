@@ -20,5 +20,6 @@ export function ExpandedSlideProvider({ children }: { children: React.ReactNode 
 
 export function useExpandedSlide(): ExpandedSlideContextValue {
   const ctx = useContext(ExpandedSlideContext);
+  if (!ctx) throw new Error("useExpandedSlide must be used within ExpandedSlideProvider");
   return ctx;
 }

@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   const slideIds = Array.isArray(body.slide_ids)
     ? body.slide_ids
         .map((s: unknown) => (typeof s === "number" ? s : typeof s === "string" ? parseInt(s, 10) : NaN))
-        .filter((n): n is number => !isNaN(n))
+        .filter((n: number): n is number => !isNaN(n))
     : [];
 
   if (!code) {
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
 
   if (slideIds.length > 0 && created?.id) {
     const { error } = await supabaseAdmin.from("invite_code_slides").insert(
-      slideIds.map((slide_id) => ({ invite_code_id: created.id, slide_id }))
+      slideIds.map((slide_id: number) => ({ invite_code_id: created.id, slide_id }))
     );
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
