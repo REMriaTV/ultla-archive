@@ -43,7 +43,7 @@ export async function PATCH(
     // slide_id は DB で bigint のため、数値・文字列両方を受け付ける（Supabase は bigint を number で返す）
     const slideIds = body.slide_ids
       .map((s: unknown) => (typeof s === "number" ? s : typeof s === "string" ? parseInt(s, 10) : NaN))
-      .filter((n): n is number => !isNaN(n));
+      .filter((n: number): n is number => !isNaN(n));
     await supabaseAdmin.from("invite_code_slides").delete().eq("invite_code_id", id);
     if (slideIds.length > 0) {
       const { error } = await supabaseAdmin.from("invite_code_slides").insert(
