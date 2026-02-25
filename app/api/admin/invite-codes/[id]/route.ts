@@ -47,7 +47,7 @@ export async function PATCH(
     await supabaseAdmin.from("invite_code_slides").delete().eq("invite_code_id", id);
     if (slideIds.length > 0) {
       const { error } = await supabaseAdmin.from("invite_code_slides").insert(
-        slideIds.map((slide_id) => ({ invite_code_id: id, slide_id }))
+        slideIds.map((slide_id: number) => ({ invite_code_id: id, slide_id }))
       );
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     }
