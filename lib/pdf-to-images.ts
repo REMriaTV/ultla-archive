@@ -12,6 +12,23 @@
  */
 import sharp from "sharp";
 
+/** Node では DOMMatrix がないため、pdf-to-img（pdf.js 系）用に polyfill を用意 */
+function ensureDOMMatrixPolyfill() {
+  if (typeof globalThis.DOMMatrix !== "undefined") return;
+  (globalThis as unknown as { DOMMatrix: unknown }).DOMMatrix = class DOMMatrix {
+    constructor(_init?: number[] | string) {}
+    multiplySelf() {
+      return this;
+    }
+    inverse() {
+      return this;
+    }
+    transformPoint(_p?: { x: number; y: number }) {
+      return { x: 0, y: 0 };
+    }
+  };
+}
+
 const MAX_WIDTH = 1920;
 
 /** 各画像バッファに sharp で後処理（白背景 flatten + リサイズ）を適用 */
@@ -24,6 +41,8 @@ async function processImageBuffer(buf: Buffer): Promise<Buffer> {
 }
 
 export async function pdfToImageBuffers(pdfBuffer: Buffer): Promise<Buffer[]> {
+  ensureDOMMatrixPolyfill();
+
   const startTime = Date.now();
   let library: "pdf2pic" | "pdf-to-img" = "pdf-to-img";
   let rawBuffers: Buffer[] = [];
