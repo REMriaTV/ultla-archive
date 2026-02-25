@@ -2,10 +2,32 @@ import { pathToFileURL } from "node:url";
 import * as path from "node:path";
 
 /**
+ * Node 環境では DOMMatrix が存在しないため、pdfjs-dist 用の最小限の polyfill を用意する。
+ * テキスト抽出のみの用途では、実装の中身は使われないことが多い。
+ */
+function ensureDOMMatrixPolyfill() {
+  if (typeof globalThis.DOMMatrix !== "undefined") return;
+  globalThis.DOMMatrix = class DOMMatrix {
+    constructor(_init?: number[] | string) {}
+    multiplySelf() {
+      return this;
+    }
+    inverse() {
+      return this;
+    }
+    transformPoint(_p?: { x: number; y: number }) {
+      return { x: 0, y: 0 };
+    }
+  } as unknown as typeof DOMMatrix;
+}
+
+/**
  * pdfjs-dist を使って PDF からテキストを抽出
  * worker は node_modules の絶対パス（file:// URL）で指定
  */
 export async function extractTextFromPdf(pdfBuffer: Buffer): Promise<string> {
+  ensureDOMMatrixPolyfill();
+
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
   const workerPath = path.join(
