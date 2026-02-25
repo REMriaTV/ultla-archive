@@ -110,12 +110,54 @@ export default function AdminPage() {
   const [inviteCodeEditForm, setInviteCodeEditForm] = useState({ name: "", description: "", slide_ids: [] as string[] });
   const [savingInviteCode, setSavingInviteCode] = useState(false);
 
+  const [siteSettingsSubtitle, setSiteSettingsSubtitle] = useState("");
+  const [siteSettingsFooterText, setSiteSettingsFooterText] = useState("");
+  const [savingSiteSettings, setSavingSiteSettings] = useState(false);
+
   useEffect(() => {
     loadSlides();
     loadPrograms();
     loadGenreTypes();
     loadInviteCodes();
+    loadSiteSettings();
   }, []);
+
+  async function loadSiteSettings() {
+    try {
+      const res = await fetch("/api/admin/site-settings");
+      if (!res.ok) return;
+      const data = await res.json();
+      setSiteSettingsSubtitle(data.subtitle ?? "");
+      setSiteSettingsFooterText(data.footer_text ?? "");
+    } catch {
+      console.error("サイト設定読み込み失敗");
+    }
+  }
+
+  async function handleSaveSiteSettings(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingSiteSettings(true);
+    try {
+      const res = await fetch("/api/admin/site-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subtitle: siteSettingsSubtitle,
+          footer_text: siteSettingsFooterText,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error ?? "保存に失敗しました");
+        return;
+      }
+      alert("サイト設定を保存しました");
+    } catch (err) {
+      alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSavingSiteSettings(false);
+    }
+  }
 
   async function loadGenreTypes() {
     try {
@@ -599,6 +641,43 @@ export default function AdminPage() {
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-8">
+        {/* サイト設定（サブタイトル・フッター文言） */}
+        <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
+          <h2 className="mb-4 text-lg font-semibold text-neutral-800">サイト設定</h2>
+          <p className="mb-6 text-sm text-neutral-600">
+            トップページのヘッダー下のキャッチコピーと、フッター横のテキストを編集できます。それぞれ独立して変更可能です。
+          </p>
+          <form onSubmit={handleSaveSiteSettings} className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-neutral-700">サブタイトル（ヘッダー下）</label>
+              <input
+                type="text"
+                value={siteSettingsSubtitle}
+                onChange={(e) => setSiteSettingsSubtitle(e.target.value)}
+                placeholder="例: いつでも、どこでも、学びのレシピ"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-neutral-700">フッター横のテキスト</label>
+              <input
+                type="text"
+                value={siteSettingsFooterText}
+                onChange={(e) => setSiteSettingsFooterText(e.target.value)}
+                placeholder="例: SPACE ARCHIVE — いつでも、どこでも、学びのレシピ"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={savingSiteSettings}
+              className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+            >
+              {savingSiteSettings ? "保存中..." : "保存"}
+            </button>
+          </form>
+        </section>
+
         {/* ジャンル種別（プログラム・組織をオーガナイズ・自治体等のマスタ） */}
         <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
           <div className="mb-4 flex items-center justify-between">

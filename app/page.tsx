@@ -32,9 +32,13 @@ export default async function Home(props: HomeProps) {
   const supabase = await createClient();
   const accessCtx = await getAccessContext(supabase, supabaseAdmin ?? null);
 
+  const DEFAULT_SUBTITLE = "いつでも、どこでも、学びのレシピ";
+  const DEFAULT_FOOTER = "SPACE ARCHIVE — いつでも、どこでも、学びのレシピ";
+
   const [
     { data: programs, error: programsError },
     { data: allSlides, error: slidesError },
+    { data: siteSettings },
   ] = await Promise.all([
     supabase
       .from("programs")
@@ -43,7 +47,11 @@ export default async function Home(props: HomeProps) {
     accessCtx.isAdmin && supabaseAdmin
       ? supabaseAdmin.from("slides").select("*")
       : supabase.from("slides").select("*"),
+    supabase.from("site_settings").select("subtitle, footer_text").eq("id", "main").single(),
   ]);
+
+  const subtitle = typeof siteSettings?.subtitle === "string" ? siteSettings.subtitle : DEFAULT_SUBTITLE;
+  const footerText = typeof siteSettings?.footer_text === "string" ? siteSettings.footer_text : DEFAULT_FOOTER;
 
   if (programsError) console.error("Programs fetch error:", programsError);
   if (slidesError) console.error("Slides fetch error:", slidesError);
@@ -134,7 +142,7 @@ export default async function Home(props: HomeProps) {
             SPACE ARCHIVE
           </h1>
           <p className="mt-1 text-sm" style={{ color: "var(--fg-muted)" }}>
-            いつでも、どこでも、学びのレシピ
+            {subtitle}
           </p>
         </div>
       </header>
@@ -221,7 +229,7 @@ export default async function Home(props: HomeProps) {
           className="mx-auto max-w-4xl px-6 text-center text-sm"
           style={{ color: "var(--fg-muted)" }}
         >
-          SPACE ARCHIVE — いつでも、どこでも、学びのレシピ
+          {footerText}
           <span className="mx-2">|</span>
           <Link href="/admin" className="hover:opacity-80">
             管理
