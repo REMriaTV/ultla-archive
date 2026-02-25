@@ -1,26 +1,203 @@
 @import "tailwindcss";
 
+/* ===== テーマプロトタイプ用 CSS 変数 ===== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #ffffff;
+  --bg-header: rgba(255, 255, 255, 0.95);
+  --fg: #171717;
+  --fg-muted: #525252;
+  --border: #e5e5e5;
+  --card: #ffffff;
+  --card-hover: #fafafa;
+  --accent: #0ea5e9;
+  --accent-hover: #0284c7;
+  --btn-primary-bg: #171717;
+  --btn-primary-fg: #ffffff;
+  --btn-primary-hover: #262626;
+}
+
+/* 光・水のライト: 開かれた、柔らかい青み */
+html[data-theme="light-water"] {
+  --bg: #f0f9ff;
+  --bg-header: rgba(240, 249, 255, 0.92);
+  --fg: #0c4a6e;
+  --fg-muted: #0369a1;
+  --border: #bae6fd;
+  --card: rgba(255, 255, 255, 0.95);
+  --card-hover: #e0f2fe;
+  --accent: #0284c7;
+  --accent-hover: #0369a1;
+  --btn-primary-bg: #0369a1;
+  --btn-primary-fg: #ffffff;
+  --btn-primary-hover: #0c4a6e;
+}
+
+/* 深い光・ダーク: 光が差し込む、洗練された暗部 */
+html[data-theme="dark-light"] {
+  --bg: #0f172a;
+  --bg-header: rgba(15, 23, 42, 0.95);
+  --fg: #f1f5f9;
+  --fg-muted: #94a3b8;
+  --border: #334155;
+  --card: #1e293b;
+  --card-hover: #334155;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --btn-primary-bg: #38bdf8;
+  --btn-primary-fg: #0f172a;
+  --btn-primary-hover: #7dd3fc;
+}
+
+/* 洗練ウォーム: 高級感、温かみのある落ち着き */
+html[data-theme="warm-refined"] {
+  --bg: #faf9f7;
+  --bg-header: rgba(250, 249, 247, 0.95);
+  --fg: #292524;
+  --fg-muted: #78716c;
+  --border: #e7e5e4;
+  --card: #ffffff;
+  --card-hover: #f5f5f4;
+  --accent: #a16207;
+  --accent-hover: #854d0e;
+  --btn-primary-bg: #292524;
+  --btn-primary-fg: #fafaf9;
+  --btn-primary-hover: #44403c;
+}
+
+/* ブルーと夕焼けオレンジ: 光とゆらぎのグラデーション */
+html[data-theme="blue-orange"] {
+  --bg: linear-gradient(
+    165deg,
+    #0c4a6e 0%,
+    #0369a1 22%,
+    #0ea5e9 40%,
+    #38bdf8 55%,
+    #7dd3fc 68%,
+    #bae6fd 78%,
+    #fed7aa 88%,
+    #fdba74 94%,
+    #ea580c 100%
+  );
+  --bg-header: rgba(255, 255, 255, 0.88);
+  --fg: #1c1917;
+  --fg-muted: #57534e;
+  --border: rgba(255, 255, 255, 0.5);
+  --card: rgba(255, 255, 255, 0.9);
+  --card-hover: rgba(255, 255, 255, 0.95);
+  --accent: #ea580c;
+  --accent-hover: #c2410c;
+  --btn-primary-bg: #0c4a6e;
+  --btn-primary-fg: #ffffff;
+  --btn-primary-hover: #0369a1;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* ブルー・オレンジテーマ: 背景グラデーションのゆらぎ（ごくゆっくり） */
+html[data-theme="blue-orange"] body {
+  background-size: 120% 120%;
+  animation: theme-gradient-drift 25s ease-in-out infinite alternate;
+}
+
+@keyframes theme-gradient-drift {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 100% 100%;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* スライド詳細：PDF表示時のオーバーレイ（テーマ対応） */
+.slide-pdf-overlay {
+  background: linear-gradient(
+    to top,
+    var(--card) 0%,
+    color-mix(in srgb, var(--card) 90%, transparent) 30%,
+    transparent
+  );
+}
+
+/* ヘッダー内の文字はテーマ色を継承（ダークでも視認性を確保） */
+header a,
+header span,
+header button {
+  color: var(--fg-muted);
+}
+header a:hover,
+header button:hover {
+  color: var(--fg);
+}
+header span.font-medium {
+  color: var(--fg);
+}
+
+/* モバイルのみヘッダー文字を読みやすく・1行に収める */
+@media (max-width: 767px) {
+  .header-inner {
+    flex-wrap: nowrap;
+  }
+  header a,
+  header span,
+  header button {
+    color: var(--fg);
+    font-weight: 500;
+    font-size: 0.75rem; /* 12px で1行に収めつつ可読性確保 */
+    white-space: nowrap;
+  }
+  header a:hover,
+  header button:hover {
+    opacity: 0.85;
+  }
+}
+
+/* 入力欄のプレースホルダー */
+input::placeholder {
+  color: var(--fg-muted);
+  opacity: 0.7;
+}
+
+/* シリーズ棚サムネイル幅（デスクトップはこの値） */
+.program-shelf-thumb {
+  width: clamp(150px, 21vw, 210px);
+}
+
+/* モバイルのみ少し大きく（639px以下） */
+@media (max-width: 639px) {
+  .program-shelf-thumb {
+    width: clamp(180px, 27vw, 230px);
+  }
+}
+
+/* ===== ダウンロード・印刷制限（スライドコンテンツ保護） ===== */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  body {
+    position: relative;
+  }
+  body::before {
+    content: "このコンテンツのダウンロード・印刷はご遠慮ください。";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    visibility: visible !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    font-size: 18pt;
+    background: white;
+  }
 }

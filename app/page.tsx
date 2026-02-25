@@ -1,65 +1,233 @@
-import Image from "next/image";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { ExpandedSlideProvider } from "@/components/ExpandedSlideContext";
+import { GuestBanner } from "@/components/GuestBanner";
+import { HeroSlides } from "@/components/HeroSlides";
+import { InviteSeriesShelf, MylistShelf, ProgramShelf } from "@/components/ProgramShelf";
+import { SearchSection } from "@/components/SearchSection";
+import { getAccessContext, filterVisibleSlides } from "@/lib/access";
+import type { Slide } from "@/lib/types";
 
-export default function Home() {
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+type HomeProps = { searchParams?: Promise<{ q?: string }> | { q?: string } };
+
+/** ログイン直後も招待コードシリーズを表示するため、常に最新セッションで描画する */
+export const dynamic = "force-dynamic";
+
+export default async function Home(props: HomeProps) {
+  const searchParams = await (typeof (props.searchParams as Promise<{ q?: string }>)?.then === "function"
+    ? (props.searchParams as Promise<{ q?: string }>)
+    : Promise.resolve(props.searchParams ?? {}));
+  const initialQuery = typeof searchParams?.q === "string" ? searchParams.q : "";
+
+  const supabase = await createClient();
+  const accessCtx = await getAccessContext(supabase, supabaseAdmin ?? null);
+
+  const [
+    { data: programs, error: programsError },
+    { data: allSlides, error: slidesError },
+  ] = await Promise.all([
+    supabase
+      .from("programs")
+      .select("*")
+      .order("started_year", { ascending: true, nullsFirst: false }),
+    accessCtx.isAdmin && supabaseAdmin
+      ? supabaseAdmin.from("slides").select("*")
+      : supabase.from("slides").select("*"),
+  ]);
+
+  if (programsError) console.error("Programs fetch error:", programsError);
+  if (slidesError) console.error("Slides fetch error:", slidesError);
+
+  const allPrograms = programs ?? [];
+  const programList = allPrograms.filter(
+    (p: { show_on_front?: boolean }) => p.show_on_front !== false
+  );
+  const rawSlides = (allSlides ?? []) as Slide[];
+  const slidesList = filterVisibleSlides(rawSlides, accessCtx);
+
+  const heroSlides = shuffle(slidesList).slice(0, 5);
+
+  const slidesByProgram = new Map<string, Slide[]>();
+  for (const slide of slidesList) {
+    const list = slidesByProgram.get(slide.program_id) ?? [];
+    list.push(slide);
+    slidesByProgram.set(slide.program_id, list);
+  }
+
+  /** マイリスト：ログイン中のユーザーが保存したスライド（表示可能なもののみ・登録順） */
+  let mylistSlides: Slide[] = [];
+  if (accessCtx.userId) {
+    const { data: userSlideRows } = await supabase
+      .from("user_slides")
+      .select("slide_id, created_at")
+      .eq("user_id", accessCtx.userId)
+      .order("created_at", { ascending: false });
+    const mylistIds = new Set((userSlideRows ?? []).map((r) => String(r.slide_id)));
+    if (mylistIds.size > 0) {
+      mylistSlides = slidesList.filter((s) => mylistIds.has(String(s.id)));
+      const orderMap = new Map((userSlideRows ?? []).map((r, i) => [String(r.slide_id), i]));
+      mylistSlides.sort((a, b) => (orderMap.get(String(a.id)) ?? 0) - (orderMap.get(String(b.id)) ?? 0));
+    }
+  }
+
+  /** 招待コード1つを「1シリーズ」として一括表示する用（コード名・URL用code・そのコードで見れる全スライド） */
+  type InviteSeries = { codeId: string; codeName: string; codeSlug: string; slides: Slide[] };
+  let inviteCodeSeries: InviteSeries[] = [];
+  if (accessCtx.userId && supabaseAdmin) {
+    const now = new Date().toISOString();
+    const { data: userCodes } = await supabase
+      .from("user_invite_codes")
+      .select("invite_code_id")
+      .eq("user_id", accessCtx.userId)
+      .gt("expires_at", now);
+    const codeIds = [...new Set((userCodes ?? []).map((r) => r.invite_code_id))];
+    if (codeIds.length > 0) {
+      const [
+        { data: codes },
+        { data: codeSlides },
+      ] = await Promise.all([
+        supabaseAdmin.from("invite_codes").select("id, name, code").in("id", codeIds),
+        supabaseAdmin.from("invite_code_slides").select("invite_code_id, slide_id").in("invite_code_id", codeIds),
+      ]);
+      const slideIdsByCode = new Map<string, Set<string>>();
+      for (const row of codeSlides ?? []) {
+        const set = slideIdsByCode.get(row.invite_code_id) ?? new Set();
+        set.add(String(row.slide_id));
+        slideIdsByCode.set(row.invite_code_id, set);
+      }
+      const byId = new Map((codes ?? []).map((c) => [c.id, c]));
+      for (const codeId of codeIds) {
+        const codeRow = byId.get(codeId);
+        const codeName = codeRow?.name ?? codeRow?.code ?? codeId;
+        const codeSlug = codeRow?.code ?? codeId;
+        const ids = slideIdsByCode.get(codeId);
+        if (!ids?.size) continue;
+        const codeSlidesList = slidesList.filter((s) => ids.has(String(s.id)));
+        if (codeSlidesList.length > 0) {
+          inviteCodeSeries.push({ codeId, codeName, codeSlug, slides: codeSlidesList });
+        }
+      }
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
+      <header
+        className="border-b"
+        style={{ borderColor: "var(--border)", background: "var(--card)" }}
+      >
+        <div className="mx-auto max-w-4xl px-6 py-4">
+          <h1
+            className="text-2xl font-bold tracking-tight"
+            style={{ color: "var(--fg)" }}
+          >
+            ULTLA ARCHIVES
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-1 text-sm" style={{ color: "var(--fg-muted)" }}>
+            福本理恵氏の探究学習プログラムの系譜とスライドアーカイブ
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+      </header>
+
+      <main className="mx-auto max-w-4xl px-6 py-6">
+        <GuestBanner />
+        {/* ヒーロースライド（main の px を打ち消して幅いっぱいに） */}
+        <section className="-mx-6 mb-6">
+          <HeroSlides slides={heroSlides} intervalMs={5500} />
+        </section>
+
+        {/* 検索セクション（ヘッダー検索から ?q= で来た場合は初期値＋自動検索） */}
+        <section className="mb-10">
+          <h2 className="mb-3 text-lg font-semibold" style={{ color: "var(--fg)" }}>
+            気になるキーワードでスライド検索
+          </h2>
+          <SearchSection initialQuery={initialQuery} />
+        </section>
+
+        {/* シリーズ棚（招待コードごと ＋ 全体） */}
+        <ExpandedSlideProvider>
+          <section className="mt-12">
+            <h2 className="mb-6 text-lg font-semibold" style={{ color: "var(--fg)" }}>
+              シリーズ
+            </h2>
+
+            {/* マイリスト（ログイン中かつ1件以上あるときのみ表示） */}
+            {mylistSlides.length > 0 && (
+              <MylistShelf slides={mylistSlides} programs={allPrograms} className="mb-8 md:mb-10" />
+            )}
+
+            {/* 招待コードで見れるシリーズ（1コード＝1シリーズに一括。ジャンル混ぜて表示。「すべて表示」で専用ページへ） */}
+            {inviteCodeSeries.length > 0 && (
+              <div id="invite-codes-series" className="mb-10 scroll-mt-24">
+                <p className="mb-3 text-sm" style={{ color: "var(--fg-muted)" }}>
+                  <Link href="/mypage/invite-codes" className="hover:opacity-90">
+                    招待コードの追加・確認
+                  </Link>
+                  はマイページから
+                </p>
+                {inviteCodeSeries.map(({ codeId, codeName, codeSlug, slides }) => (
+                  <InviteSeriesShelf
+                    key={codeId}
+                    id={codeId}
+                    codeName={codeName}
+                    codeSlug={codeSlug}
+                    slides={slides}
+                    programs={allPrograms}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* すべてのシリーズ（従来どおり） */}
+            {inviteCodeSeries.length > 0 && (
+              <h3 className="mb-4 text-base font-medium" style={{ color: "var(--fg-muted)" }}>
+                すべてのシリーズ
+              </h3>
+            )}
+            {programList.length === 0 ? (
+              <p className="py-8 text-center" style={{ color: "var(--fg-muted)" }}>
+                プログラムデータがありません
+              </p>
+            ) : (
+              programList.map((program) => (
+                <div
+                  key={program.id}
+                  id={`program-${program.id}`}
+                  className="scroll-mt-24"
+                >
+                  <ProgramShelf
+                    program={program}
+                    slides={slidesByProgram.get(program.id) ?? []}
+                  />
+                </div>
+              ))
+            )}
+          </section>
+        </ExpandedSlideProvider>
       </main>
+
+      <footer className="mt-24 border-t py-8" style={{ borderColor: "var(--border)" }}>
+        <div
+          className="mx-auto max-w-4xl px-6 text-center text-sm"
+          style={{ color: "var(--fg-muted)" }}
+        >
+          ULTLA ARCHIVES — 知の貯蔵庫
+          <span className="mx-2">|</span>
+          <Link href="/admin" className="hover:opacity-80">
+            管理
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }
