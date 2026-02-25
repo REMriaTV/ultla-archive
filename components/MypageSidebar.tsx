@@ -67,7 +67,7 @@ export function MypageSidebar() {
           className="text-lg font-bold tracking-tight"
           style={{ color: "var(--fg)" }}
         >
-          ULTLA ARCHIVES
+          SPACE ARCHIVE
         </Link>
 
         <nav className="flex flex-col gap-1">

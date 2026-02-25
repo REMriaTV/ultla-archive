@@ -20,8 +20,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ULTLA ARCHIVES",
-  description: "福本理恵氏の探究学習プログラムの系譜とスライドアーカイブ",
+  title: "SPACE ARCHIVE",
+  description: "いつでも、どこでも、学びのレシピ",
 };
 
 export default async function RootLayout({

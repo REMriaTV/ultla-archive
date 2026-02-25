@@ -85,7 +85,7 @@ function MobileSidebar({ onClose }: MobileSidebarProps) {
           className="text-base font-bold tracking-tight"
           style={{ color: "var(--fg)" }}
         >
-          ULTLA ARCHIVES
+          SPACE ARCHIVE
         </Link>
         <button
           type="button"

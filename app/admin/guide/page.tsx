@@ -5,7 +5,7 @@ export default function AdminGuidePage() {
     <main className="mx-auto max-w-3xl px-6 py-8 space-y-8">
       <header className="space-y-2">
         <h1 className="text-2xl font-bold text-neutral-900">
-          ULTLA ARCHIVES 管理者ガイド
+          SPACE ARCHIVE 管理者ガイド
         </h1>
         <p className="text-sm text-neutral-600">
           このページは、スライドの公開レベルと招待コードの動き方を管理者目線で整理したメモです。
@@ -22,7 +22,7 @@ export default function AdminGuidePage() {
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-neutral-900">1. 役割と見え方</h2>
         <p className="text-sm text-neutral-700">
-          ULTLA ARCHIVES では、ユーザーの「見え方」は次の3つで決まります。
+          SPACE ARCHIVE では、ユーザーの「見え方」は次の3つで決まります。
         </p>
         <ul className="list-disc space-y-1 pl-5 text-sm text-neutral-700">
           <li>ログインしていない人（一般公開のチラ見せ用）</li>

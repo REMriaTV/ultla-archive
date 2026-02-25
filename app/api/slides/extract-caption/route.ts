@@ -49,10 +49,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ caption, message: "キャプションを生成しました" });
   } catch (err) {
     console.error("Extract caption error:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    const isFormDataError = /formdata|body|parse/i.test(message);
     return NextResponse.json(
       {
         error: "抽出に失敗しました",
-        details: err instanceof Error ? err.message : String(err),
+        details: message,
+        ...(isFormDataError && {
+          hint: "PDFが大きい場合、サーバーの制限で失敗することがあります。しばらく待って再試行するか、PDFを小さくしてからお試しください。",
+        }),
       },
       { status: 500 }
     );

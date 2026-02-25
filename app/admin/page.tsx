@@ -403,7 +403,7 @@ export default function AdminPage() {
   }
 
   async function handleExtractKeywords() {
-    const form = document.querySelector("form");
+    const form = document.getElementById("create-slide-form") as HTMLFormElement | null;
     const fileInput = form?.pdf as HTMLInputElement | undefined;
     const file = fileInput?.files?.[0];
     if (!file) {
@@ -446,7 +446,7 @@ export default function AdminPage() {
   }
 
   async function handleExtractCaption() {
-    const form = document.querySelector("form");
+    const form = document.getElementById("create-slide-form") as HTMLFormElement | null;
     const fileInput = form?.pdf as HTMLInputElement | undefined;
     const file = fileInput?.files?.[0];
     if (!file) {
@@ -1279,7 +1279,7 @@ export default function AdminPage() {
             PDFをアップロードするだけで、画像変換・Storage保存・DB登録まで自動で完了します。
           </p>
 
-          <form onSubmit={handleCreate} className="space-y-4">
+          <form id="create-slide-form" onSubmit={handleCreate} className="space-y-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-neutral-700">
                 PDFファイル *

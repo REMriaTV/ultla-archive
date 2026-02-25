@@ -131,10 +131,10 @@ export default async function Home(props: HomeProps) {
             className="text-2xl font-bold tracking-tight"
             style={{ color: "var(--fg)" }}
           >
-            ULTLA ARCHIVES
+            SPACE ARCHIVE
           </h1>
           <p className="mt-1 text-sm" style={{ color: "var(--fg-muted)" }}>
-            福本理恵氏の探究学習プログラムの系譜とスライドアーカイブ
+            いつでも、どこでも、学びのレシピ
           </p>
         </div>
       </header>
@@ -221,7 +221,7 @@ export default async function Home(props: HomeProps) {
           className="mx-auto max-w-4xl px-6 text-center text-sm"
           style={{ color: "var(--fg-muted)" }}
         >
-          ULTLA ARCHIVES — 知の貯蔵庫
+          SPACE ARCHIVE — いつでも、どこでも、学びのレシピ
           <span className="mx-2">|</span>
           <Link href="/admin" className="hover:opacity-80">
             管理

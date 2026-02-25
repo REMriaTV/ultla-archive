@@ -150,11 +150,14 @@ export function LoginForm() {
           </div>
         )}
 
+        <p className="mt-4 text-xs text-neutral-500 leading-relaxed">
+          「Google でログイン」を押すと、セキュリティのため認証サービスの画面が表示されます。「supabase.co」という長いアドレスが出ても問題ありません。安全なログイン処理の一環です。
+        </p>
         <button
           type="button"
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-3 font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-3 font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24">
             <path
