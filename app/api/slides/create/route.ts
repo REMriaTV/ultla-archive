@@ -111,18 +111,18 @@ export async function POST(request: Request) {
     // DBの id が number で返る場合があるため、Storage path 用は必ず文字列にする（number が渡ると "path must be string" になる）
     const slideId = String(newSlide.id);
 
-    // 2. PDFをStorageにアップロード
-    const pdfPath = `${slideId}/original.pdf`;
+    // 2. PDFをStorageにアップロード（path は必ず文字列で組み立て）
+    const pdfPath = [slideId, "original.pdf"].join("/");
 
     const { error: pdfUploadError } = await supabaseAdmin.storage
       .from(BUCKET_NAME)
-      .upload(String(pdfPath), pdfBuffer, {
+      .upload(pdfPath, pdfBuffer, {
         contentType: "application/pdf",
         upsert: true,
       });
 
     if (pdfUploadError) {
-      await supabaseAdmin.from("slides").delete().eq("id", newSlide.id);
+      await supabaseAdmin.from("slides").delete().eq("id", slideId);
       return NextResponse.json(
         { error: "PDFのアップロードに失敗しました", details: pdfUploadError.message },
         { status: 500 }
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
     await supabaseAdmin
       .from("slides")
       .update({ pdf_url: pdfUrl })
-      .eq("id", newSlide.id);
+      .eq("id", slideId);
 
     // 4. PDFを画像に変換（pdf2pic優先、失敗時はpdf-to-img）
     const { pdfToImageBuffers } = await import("@/lib/pdf-to-images");
@@ -148,10 +148,10 @@ export async function POST(request: Request) {
 
     for (const image of imageBuffers) {
       const fileName = `pages/page_${pageIndex}.png`;
-      const storagePath = `${slideId}/${fileName}`;
+      const storagePath = [slideId, fileName].join("/");
       const { error: imgUploadError } = await supabaseAdmin.storage
         .from(BUCKET_NAME)
-        .upload(String(storagePath), image, {
+        .upload(storagePath, image, {
           contentType: "image/png",
           upsert: true,
         });
@@ -182,7 +182,7 @@ export async function POST(request: Request) {
         page_image_urls: pageImageUrls,
         image_url: pageImageUrls[0] ?? null,
       })
-      .eq("id", newSlide.id);
+      .eq("id", slideId);
 
     return NextResponse.json({
       success: true,
