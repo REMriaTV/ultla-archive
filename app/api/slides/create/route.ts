@@ -108,6 +108,7 @@ export async function POST(request: Request) {
       );
     }
 
+    // DBの id が number で返る場合があるため、Storage path 用は必ず文字列にする（number が渡ると "path must be string" になる）
     const slideId = String(newSlide.id);
 
     // 2. PDFをStorageにアップロード
@@ -115,7 +116,7 @@ export async function POST(request: Request) {
 
     const { error: pdfUploadError } = await supabaseAdmin.storage
       .from(BUCKET_NAME)
-      .upload(pdfPath, pdfBuffer, {
+      .upload(String(pdfPath), pdfBuffer, {
         contentType: "application/pdf",
         upsert: true,
       });
@@ -147,9 +148,10 @@ export async function POST(request: Request) {
 
     for (const image of imageBuffers) {
       const fileName = `pages/page_${pageIndex}.png`;
+      const storagePath = `${slideId}/${fileName}`;
       const { error: imgUploadError } = await supabaseAdmin.storage
         .from(BUCKET_NAME)
-        .upload(`${slideId}/${fileName}`, image, {
+        .upload(String(storagePath), image, {
           contentType: "image/png",
           upsert: true,
         });
@@ -167,7 +169,7 @@ export async function POST(request: Request) {
 
       const { data: { publicUrl } } = supabaseAdmin.storage
         .from(BUCKET_NAME)
-        .getPublicUrl(`${slideId}/${fileName}`);
+        .getPublicUrl(storagePath);
       pageImageUrls.push(publicUrl);
       pageIndex++;
     }

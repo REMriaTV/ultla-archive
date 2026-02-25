@@ -9,7 +9,9 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
+  const { id: rawId } = await params;
+  // 動的ルートの id が number で渡ることがあるため、Storage path 用は必ず文字列にする
+  const id = rawId != null ? String(rawId) : "";
 
   if (!id) {
     return NextResponse.json(
@@ -57,9 +59,10 @@ export async function POST(
 
     for (const image of imageBuffers) {
       const fileName = `pages/page_${pageIndex}.png`;
+      const storagePath = `${id}/${fileName}`;
       const { error: uploadError } = await supabaseAdmin.storage
         .from(BUCKET_NAME)
-        .upload(`${id}/${fileName}`, image, {
+        .upload(String(storagePath), image, {
           contentType: "image/png",
           upsert: true,
         });
@@ -77,7 +80,7 @@ export async function POST(
 
       const {
         data: { publicUrl },
-      } = supabaseAdmin.storage.from(BUCKET_NAME).getPublicUrl(`${id}/${fileName}`);
+      } = supabaseAdmin.storage.from(BUCKET_NAME).getPublicUrl(storagePath);
       pageImageUrls.push(publicUrl);
       pageIndex++;
     }
