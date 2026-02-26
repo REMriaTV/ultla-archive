@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ExpandedSlideProvider } from "@/components/ExpandedSlideContext";
+import { AnnouncementCardWhenLoggedIn } from "@/components/AnnouncementCardWhenLoggedIn";
 import { GuestBanner } from "@/components/GuestBanner";
 import { HeroSlides } from "@/components/HeroSlides";
 import { InviteSeriesShelf, MylistShelf, ProgramShelf } from "@/components/ProgramShelf";
@@ -173,24 +174,10 @@ export default async function Home(props: HomeProps) {
       <main className="px-6 py-6">
         <GuestBanner />
         {latestAnnouncement && (
-          <Link
-            href="/mypage/announcements"
-            className="mb-4 block rounded-lg border px-4 py-3 text-sm hover:opacity-90"
-            style={{
-              borderColor: "var(--border)",
-              background: "var(--card)",
-              color: "var(--fg-muted)",
-            }}
-          >
-            <span className="font-medium" style={{ color: "var(--fg)" }}>
-              {latestAnnouncement.title}
-            </span>
-            {latestAnnouncementDate && (
-              <span className="ml-2 text-xs" style={{ color: "var(--fg-muted)" }}>
-                {latestAnnouncementDate} 公開
-              </span>
-            )}
-          </Link>
+          <AnnouncementCardWhenLoggedIn
+            title={latestAnnouncement.title}
+            publishedAt={latestAnnouncementDate || null}
+          />
         )}
         {/* ヒーロースライド（main の px を打ち消して幅いっぱいに） */}
         <section className="-mx-6 mb-6">

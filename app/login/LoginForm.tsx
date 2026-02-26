@@ -118,8 +118,8 @@ export function LoginForm() {
           }
         }
         if (data.session) {
-          router.push("/");
-          router.refresh();
+          // セッション確定後にサーバー描画と同期させるため、ハードリダイレクトでトップへ
+          window.location.href = "/";
           return;
         }
         setMessage({
@@ -129,8 +129,8 @@ export function LoginForm() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        router.push("/");
-        router.refresh();
+        // ログイン後はハードリダイレクトでトップへ。サーバーが最新のセッションを確実に読む
+        window.location.href = "/";
       }
     } catch (err) {
       setMessage({

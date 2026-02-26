@@ -70,7 +70,7 @@ export function HeaderInviteCodeInput() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="hidden items-center gap-1 sm:flex"
+      className="flex items-center gap-1"
       aria-label="招待コード入力"
     >
       <input

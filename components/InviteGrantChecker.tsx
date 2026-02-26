@@ -1,25 +1,41 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
 /**
  * ログイン後、招待コードでアクセス付与が必要なユーザーを処理する。
  * Google OAuth やメール確認後のリダイレクト時に実行。
+ * ログイン直後にサーバー描画を同期させるため、ユーザーがいる場合は1回 router.refresh() する。
  */
 export function InviteGrantChecker() {
   const router = useRouter();
+  const refreshedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
 
     async function check() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || cancelled) return;
+
+      // セッションが遅れて復元される場合: 少し待ってから再チェックし、その時点でユーザーがいれば refresh
+      if (!user) {
+        await new Promise((r) => setTimeout(r, 250));
+        if (cancelled) return;
+        const { data: { user: userDelayed } } = await supabase.auth.getUser();
+        if (userDelayed && !refreshedRef.current) {
+          refreshedRef.current = true;
+          router.refresh();
+        }
+        return;
+      }
+
+      if (cancelled) return;
 
       // Google OAuth 直後のリダイレクト: クライアントでセッションが確定したらサーバーを再描画
       if (typeof window !== "undefined" && window.location.hash) {
+        refreshedRef.current = true;
         router.refresh();
         window.history.replaceState(null, "", window.location.pathname + window.location.search);
       }
