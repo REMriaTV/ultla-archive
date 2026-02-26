@@ -134,6 +134,22 @@ export default function AdminPage() {
   const [replyForm, setReplyForm] = useState({ subject: "", body: "" });
   const [sendingReply, setSendingReply] = useState(false);
 
+  const [announcements, setAnnouncements] = useState<Array<{
+    id: string;
+    title: string;
+    body: string;
+    is_published: boolean;
+    created_at: string;
+    updated_at: string;
+    published_at: string;
+  }>>([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+  const [creatingAnnouncement, setCreatingAnnouncement] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState({ title: "", body: "", is_published: true });
+  const [editingAnnouncement, setEditingAnnouncement] = useState<typeof announcements[0] | null>(null);
+  const [announcementEditForm, setAnnouncementEditForm] = useState({ title: "", body: "", is_published: true });
+  const [savingAnnouncement, setSavingAnnouncement] = useState(false);
+
   useEffect(() => {
     loadSlides();
     loadPrograms();
@@ -141,6 +157,7 @@ export default function AdminPage() {
     loadInviteCodes();
     loadSiteSettings();
     loadInquiries();
+    loadAnnouncements();
   }, []);
 
   async function loadSiteSettings() {
@@ -196,6 +213,99 @@ export default function AdminPage() {
       console.error("お問い合わせ一覧読み込み失敗");
     } finally {
       setLoadingInquiries(false);
+    }
+  }
+
+  async function loadAnnouncements() {
+    setLoadingAnnouncements(true);
+    try {
+      const res = await fetch("/api/admin/announcements");
+      const data = await res.json();
+      if (res.ok && Array.isArray(data)) setAnnouncements(data);
+    } catch {
+      console.error("お知らせ一覧読み込み失敗");
+    } finally {
+      setLoadingAnnouncements(false);
+    }
+  }
+
+  async function handleCreateAnnouncement(e: React.FormEvent) {
+    e.preventDefault();
+    if (!announcementForm.title.trim() || !announcementForm.body.trim()) {
+      alert("タイトルと本文を入力してください");
+      return;
+    }
+    setSavingAnnouncement(true);
+    try {
+      const res = await fetch("/api/admin/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: announcementForm.title.trim(),
+          body: announcementForm.body.trim(),
+          is_published: announcementForm.is_published,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "作成に失敗しました");
+        return;
+      }
+      setAnnouncements((prev) => [data, ...prev]);
+      setCreatingAnnouncement(false);
+      setAnnouncementForm({ title: "", body: "", is_published: true });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "お知らせの作成に失敗しました");
+    } finally {
+      setSavingAnnouncement(false);
+    }
+  }
+
+  async function handleUpdateAnnouncement(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingAnnouncement) return;
+    if (!announcementEditForm.title.trim() || !announcementEditForm.body.trim()) {
+      alert("タイトルと本文を入力してください");
+      return;
+    }
+    setSavingAnnouncement(true);
+    try {
+      const res = await fetch(`/api/admin/announcements/${encodeURIComponent(editingAnnouncement.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: announcementEditForm.title.trim(),
+          body: announcementEditForm.body.trim(),
+          is_published: announcementEditForm.is_published,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "更新に失敗しました");
+        return;
+      }
+      setAnnouncements((prev) => prev.map((a) => (a.id === editingAnnouncement.id ? data : a)));
+      setEditingAnnouncement(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "お知らせの更新に失敗しました");
+    } finally {
+      setSavingAnnouncement(false);
+    }
+  }
+
+  async function handleDeleteAnnouncement(id: string) {
+    if (!confirm("このお知らせを削除しますか？")) return;
+    try {
+      const res = await fetch(`/api/admin/announcements/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "削除に失敗しました");
+        return;
+      }
+      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+      if (editingAnnouncement?.id === id) setEditingAnnouncement(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "お知らせの削除に失敗しました");
     }
   }
 
@@ -1597,6 +1707,225 @@ export default function AdminPage() {
                       className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
                     >
                       キャンセル
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* お知らせ管理 */}
+        <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-neutral-800">お知らせ管理</h2>
+            <button
+              type="button"
+              onClick={() => {
+                setCreatingAnnouncement(true);
+                setAnnouncementForm({ title: "", body: "", is_published: true });
+              }}
+              className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            >
+              新規お知らせ
+            </button>
+          </div>
+          <p className="mb-4 text-sm text-neutral-600">
+            トップページ・ログインページ・マイページで表示するお知らせです。公開にすると published_at が更新され、最新1件がトップ・ログインに表示されます。
+          </p>
+          {loadingAnnouncements ? (
+            <p className="text-sm text-neutral-500">読み込み中...</p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-neutral-200">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-neutral-200 bg-neutral-50">
+                  <tr>
+                    <th className="px-4 py-3 font-medium text-neutral-700">公開状態</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">タイトル</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">公開日</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">更新日</th>
+                    <th className="w-28 px-4 py-3 font-medium text-neutral-700">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {announcements.map((a) => (
+                    <tr key={a.id} className="border-b border-neutral-100 last:border-0">
+                      <td className="px-4 py-3">
+                        <span
+                          className={
+                            a.is_published
+                              ? "rounded bg-green-100 px-2 py-0.5 text-xs text-green-800"
+                              : "rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600"
+                          }
+                        >
+                          {a.is_published ? "公開" : "下書き"}
+                        </span>
+                      </td>
+                      <td className="max-w-[240px] truncate px-4 py-3 text-neutral-800" title={a.title}>
+                        {a.title}
+                      </td>
+                      <td className="px-4 py-3 text-neutral-600">
+                        {a.published_at ? new Date(a.published_at).toLocaleString("ja-JP") : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-neutral-600">
+                        {a.updated_at ? new Date(a.updated_at).toLocaleString("ja-JP") : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingAnnouncement(a);
+                              setAnnouncementEditForm({
+                                title: a.title,
+                                body: a.body,
+                                is_published: a.is_published,
+                              });
+                            }}
+                            className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                          >
+                            編集
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAnnouncement(a.id)}
+                            className="rounded border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                          >
+                            削除
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {announcements.length === 0 && !loadingAnnouncements && (
+            <p className="mt-3 text-sm text-neutral-500">お知らせがありません。</p>
+          )}
+
+          {creatingAnnouncement && (
+            <form onSubmit={handleCreateAnnouncement} className="mt-6 space-y-4 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+              <h3 className="text-sm font-semibold text-neutral-800">新規お知らせ</h3>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">タイトル *</label>
+                <input
+                  type="text"
+                  value={announcementForm.title}
+                  onChange={(e) => setAnnouncementForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="例: 葉山市 食育研修に参加された皆さまへ"
+                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">本文 *</label>
+                <textarea
+                  value={announcementForm.body}
+                  onChange={(e) => setAnnouncementForm((f) => ({ ...f, body: e.target.value }))}
+                  rows={5}
+                  placeholder="お知らせ本文"
+                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  required
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="announcement_new_published"
+                  checked={announcementForm.is_published}
+                  onChange={(e) => setAnnouncementForm((f) => ({ ...f, is_published: e.target.checked }))}
+                  className="h-4 w-4 rounded border-neutral-300"
+                />
+                <label htmlFor="announcement_new_published" className="text-xs font-medium text-neutral-600">
+                  公開する
+                </label>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={savingAnnouncement}
+                  className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  {savingAnnouncement ? "作成中..." : "作成"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatingAnnouncement(false);
+                    setAnnouncementForm({ title: "", body: "", is_published: true });
+                  }}
+                  className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </form>
+          )}
+
+          {editingAnnouncement && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+              onClick={() => !savingAnnouncement && setEditingAnnouncement(null)}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="announcement-edit-title"
+            >
+              <div
+                className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-neutral-200 bg-white p-6 shadow-lg"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 id="announcement-edit-title" className="mb-4 text-lg font-semibold text-neutral-800">
+                  お知らせを編集
+                </h3>
+                <form onSubmit={handleUpdateAnnouncement} className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">タイトル *</label>
+                    <input
+                      type="text"
+                      value={announcementEditForm.title}
+                      onChange={(e) => setAnnouncementEditForm((f) => ({ ...f, title: e.target.value }))}
+                      className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">本文 *</label>
+                    <textarea
+                      value={announcementEditForm.body}
+                      onChange={(e) => setAnnouncementEditForm((f) => ({ ...f, body: e.target.value }))}
+                      rows={6}
+                      className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                      required
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="announcement_edit_published"
+                      checked={announcementEditForm.is_published}
+                      onChange={(e) => setAnnouncementEditForm((f) => ({ ...f, is_published: e.target.checked }))}
+                      className="h-4 w-4 rounded border-neutral-300"
+                    />
+                    <label htmlFor="announcement_edit_published" className="text-sm font-medium text-neutral-600">
+                      公開する（ON にすると published_at を現在時刻に更新）
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingAnnouncement(null)}
+                      className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingAnnouncement}
+                      className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                    >
+                      {savingAnnouncement ? "保存中..." : "保存"}
                     </button>
                   </div>
                 </form>

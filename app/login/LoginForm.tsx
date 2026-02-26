@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
+type LatestAnnouncement = { id: string; title: string; body: string; published_at: string } | null;
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -14,6 +16,7 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [latestAnnouncement, setLatestAnnouncement] = useState<LatestAnnouncement>(null);
 
   useEffect(() => {
     const msg = searchParams.get("message");
@@ -21,6 +24,23 @@ export function LoginForm() {
       setMessage({ type: "error", text: decodeURIComponent(msg) });
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    fetch("/api/announcements/latest")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setLatestAnnouncement(data && data.id ? data : null))
+      .catch(() => setLatestAnnouncement(null));
+  }, []);
+
+  const latestAnnouncementLead =
+    latestAnnouncement && typeof latestAnnouncement.body === "string"
+      ? (() => {
+          const firstLine = latestAnnouncement.body.split(/\r?\n/)[0]?.trim() ?? "";
+          const maxLen = 70;
+          if (!firstLine) return "";
+          return firstLine.length > maxLen ? firstLine.slice(0, maxLen) + "…" : firstLine;
+        })()
+      : "";
 
   async function validateInviteCode(code: string): Promise<boolean> {
     const res = await fetch("/api/invite/validate", {
@@ -131,6 +151,16 @@ export function LoginForm() {
         >
           ゲストのまま閲覧する
         </Link>
+        {latestAnnouncement && (
+          <p className="mb-4 w-full max-w-sm rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+            <span className="font-medium text-neutral-800">{latestAnnouncement.title}</span>
+            {latestAnnouncementLead && (
+              <span className="mt-1 block text-xs text-neutral-600">
+                {latestAnnouncementLead}
+              </span>
+            )}
+          </p>
+        )}
         <div className="mx-auto w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
         <h1 className="text-lg font-bold text-neutral-900">
           {mode === "login" ? "ログイン" : "会員登録"}

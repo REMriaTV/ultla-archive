@@ -2,7 +2,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ExpandedSlideProvider } from "@/components/ExpandedSlideContext";
-import { GuestBanner } from "@/components/GuestBanner";
 import { HeroSlides } from "@/components/HeroSlides";
 import { InviteSeriesShelf, MylistShelf, ProgramShelf } from "@/components/ProgramShelf";
 import { SearchSection } from "@/components/SearchSection";
@@ -38,6 +37,7 @@ export default async function Home(props: HomeProps) {
     { data: programs, error: programsError },
     { data: allSlides, error: slidesError },
     { data: siteSettings },
+    { data: latestAnnouncement },
   ] = await Promise.all([
     supabase
       .from("programs")
@@ -47,6 +47,13 @@ export default async function Home(props: HomeProps) {
       ? supabaseAdmin.from("slides").select("*")
       : supabase.from("slides").select("*"),
     supabase.from("site_settings").select("subtitle, hero_mode, hero_slide_count, hero_slide_ids").eq("id", "main").single(),
+    supabase
+      .from("announcements")
+      .select("id, title, body, published_at")
+      .eq("is_published", true)
+      .order("published_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const subtitle = typeof siteSettings?.subtitle === "string" ? siteSettings.subtitle : DEFAULT_SUBTITLE;
@@ -56,6 +63,11 @@ export default async function Home(props: HomeProps) {
     : 5;
   const heroSlideIdsRaw = siteSettings?.hero_slide_ids;
   const heroSlideIds = Array.isArray(heroSlideIdsRaw) ? heroSlideIdsRaw.filter((id: unknown) => typeof id === "string") : [];
+
+  const latestAnnouncementDate =
+    latestAnnouncement?.published_at
+      ? new Date(latestAnnouncement.published_at).toLocaleDateString("ja-JP")
+      : "";
 
   if (programsError) console.error("Programs fetch error:", programsError);
   if (slidesError) console.error("Slides fetch error:", slidesError);
@@ -158,7 +170,26 @@ export default async function Home(props: HomeProps) {
 
       <div className="mx-auto w-full max-w-4xl flex-1 min-w-0">
       <main className="px-6 py-6">
-        <GuestBanner />
+        {latestAnnouncement && (
+          <Link
+            href="/mypage/announcements"
+            className="mb-4 block rounded-lg border px-4 py-3 text-sm hover:opacity-90"
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--card)",
+              color: "var(--fg-muted)",
+            }}
+          >
+            <span className="font-medium" style={{ color: "var(--fg)" }}>
+              {latestAnnouncement.title}
+            </span>
+            {latestAnnouncementDate && (
+              <span className="ml-2 text-xs" style={{ color: "var(--fg-muted)" }}>
+                {latestAnnouncementDate} 公開
+              </span>
+            )}
+          </Link>
+        )}
         {/* ヒーロースライド（main の px を打ち消して幅いっぱいに） */}
         <section className="-mx-6 mb-6">
           <HeroSlides slides={heroSlides} intervalMs={5500} />
