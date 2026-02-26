@@ -30,6 +30,11 @@ export async function PATCH(
   if (typeof body.name === "string") updates.name = body.name.trim() || null;
   if (typeof body.description === "string") updates.description = body.description.trim() || null;
   if (typeof body.max_uses === "number") updates.max_uses = body.max_uses;
+  if (body.default_expires_at === null || body.default_expires_at === "") {
+    updates.default_expires_at = null;
+  } else if (typeof body.default_expires_at === "string" && body.default_expires_at.trim()) {
+    updates.default_expires_at = body.default_expires_at.trim();
+  }
 
   if (Object.keys(updates).length > 0) {
     const { error } = await supabaseAdmin

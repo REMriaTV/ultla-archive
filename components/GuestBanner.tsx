@@ -34,7 +34,7 @@ export function GuestBanner() {
         color: "var(--fg-muted)",
       }}
     >
-      一部のスライドは招待コードで全ページ閲覧できます。
+      一部のスライドは招待コードで全ページ閲覧できます（招待コードには有効期限があります）。
       <Link href="/login" className="ml-1 font-medium hover:opacity-80" style={{ color: "var(--fg)" }}>
         ログイン
       </Link>

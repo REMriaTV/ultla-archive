@@ -18,7 +18,7 @@ export async function GET() {
 
   const { data: codes, error: codesError } = await supabaseAdmin
     .from("invite_codes")
-    .select("id, code, name, description, max_uses, used_count, created_at")
+    .select("id, code, name, description, max_uses, used_count, default_expires_at, created_at")
     .order("created_at", { ascending: false });
 
   if (codesError) {
@@ -60,6 +60,9 @@ export async function POST(request: Request) {
   const code = typeof body.code === "string" ? body.code.trim().toLowerCase().replace(/\s+/g, "-") : "";
   const name = typeof body.name === "string" ? body.name.trim() : null;
   const description = typeof body.description === "string" ? body.description.trim() : null;
+  const defaultExpiresAt = typeof body.default_expires_at === "string" && body.default_expires_at.trim()
+    ? body.default_expires_at.trim()
+    : null;
   const slideIds = Array.isArray(body.slide_ids)
     ? body.slide_ids
         .map((s: unknown) => (typeof s === "number" ? s : typeof s === "string" ? parseInt(s, 10) : NaN))
@@ -78,6 +81,7 @@ export async function POST(request: Request) {
       description: description || null,
       max_uses: body.max_uses ?? 100,
       used_count: 0,
+      default_expires_at: defaultExpiresAt || null,
     })
     .select("id")
     .single();

@@ -51,7 +51,7 @@ export default async function MypageInviteCodesPage() {
         className="mb-4 text-sm"
         style={{ color: "var(--fg-muted)" }}
       >
-        登録した招待コードと有効期限です。コードを追加すると、紐づいたスライドが閲覧できます。
+        登録した招待コードと有効期限です。コードを追加すると、紐づいたスライドが閲覧できます。招待コードは期限付きです。有効期限を過ぎると閲覧できなくなります。
       </p>
       <InviteCodeForm className="mb-6" />
       <InviteCodeList items={items} />

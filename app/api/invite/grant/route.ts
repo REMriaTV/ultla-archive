@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   const { data: invite, error: fetchError } = await supabaseAdmin
     .from("invite_codes")
-    .select("id, max_uses, used_count")
+    .select("id, max_uses, used_count, default_expires_at")
     .eq("code", code)
     .single();
 
@@ -54,8 +54,12 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
-  const expiresAt = new Date(now);
-  expiresAt.setMonth(expiresAt.getMonth() + DEFAULT_EXPIRY_MONTHS);
+  const expiresAt = invite.default_expires_at
+    ? new Date(invite.default_expires_at)
+    : (() => { const d = new Date(now); d.setMonth(d.getMonth() + DEFAULT_EXPIRY_MONTHS); return d; })();
+  if (expiresAt <= now) {
+    return NextResponse.json({ error: "この招待コードの有効期限は過ぎています" }, { status: 400 });
+  }
 
   // user_invite_codes に追加
   const { error: insertError } = await supabaseAdmin

@@ -166,7 +166,7 @@ export default async function SlideDetailPage({ params }: SlideDetailPageProps) 
                   className="h-full w-full border-0"
                 />
               </div>
-              {/* PDF表示時はオーバーレイのみ（iframe内スクロールは制限不可） */}
+              {/* PDF表示時はオーバーレイのみ（iframe内スクロールは制限不可）。ログイン済みなら招待コード案内に */}
               <div
                 className="slide-pdf-overlay absolute bottom-0 left-0 right-0 flex min-h-[70%] flex-col items-center justify-end pb-8 pt-24"
                 aria-hidden
@@ -175,18 +175,19 @@ export default async function SlideDetailPage({ params }: SlideDetailPageProps) 
                   className="mb-4 max-w-md text-center text-sm"
                   style={{ color: "var(--fg)" }}
                 >
-                  最初の{freePreviewPageCount}
-                  ページは無料で閲覧できます。全ページを閲覧するにはログインのうえ、招待コードを入力してください。
+                  {accessCtx.userId
+                    ? `最初の${freePreviewPageCount}ページは無料で閲覧できます。全ページを閲覧するには、マイページの「招待コード」からコードを入力してください。招待コードには有効期限があります。`
+                    : `最初の${freePreviewPageCount}ページは無料で閲覧できます。全ページを閲覧するにはログインのうえ、招待コードを入力してください。`}
                 </p>
                 <Link
-                  href="/login"
+                  href={accessCtx.userId ? "/mypage/invite-codes" : "/login"}
                   className="rounded-lg px-6 py-3 text-sm font-medium transition-colors"
                   style={{
                     background: "var(--btn-primary-bg)",
                     color: "var(--btn-primary-fg)",
                   }}
                 >
-                  ログイン
+                  {accessCtx.userId ? "招待コードを入力" : "ログイン"}
                 </Link>
                 {isAdmin && (
                   <p className="mt-4 max-w-md text-center text-xs" style={{ color: "var(--fg-muted)" }}>

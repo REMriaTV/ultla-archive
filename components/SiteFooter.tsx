@@ -23,11 +23,11 @@ export function SiteFooter() {
       className="mt-auto border-t py-8"
       style={{ borderColor: "var(--border)" }}
     >
-      <div
-        className="mx-auto max-w-4xl px-6 text-center text-sm"
-        style={{ color: "var(--fg-muted)" }}
-      >
-        {footerText}
+      <div className="mx-auto max-w-4xl space-y-3 px-6 text-center text-sm" style={{ color: "var(--fg-muted)" }}>
+        <p className="text-xs">
+          当サイトは試用段階です。方針変更により、急に利用に制限が生じる場合があります。あらかじめご了承ください。
+        </p>
+        <p>{footerText}</p>
       </div>
     </footer>
   );

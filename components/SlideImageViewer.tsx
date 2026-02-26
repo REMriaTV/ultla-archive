@@ -72,7 +72,7 @@ export function SlideImageViewer({
                 onContextMenu={(e) => e.preventDefault()}
               />
 
-              {/* 制限ページ用オーバーレイ（4枚目以降の案内。透かしつつ案内文は濃い色で読みやすく） */}
+              {/* 制限ページ用オーバーレイ（4枚目以降の案内。ログイン済みなら招待コード案内に） */}
               {isRestricted && (
                 <div
                   className="absolute inset-0 flex flex-col items-center justify-center rounded-lg"
@@ -80,18 +80,19 @@ export function SlideImageViewer({
                   aria-hidden
                 >
                   <p className="mb-4 max-w-sm text-center text-sm font-medium text-neutral-900 drop-shadow-sm">
-                    このスライドの全{pageCount}
-                    ページを閲覧するにはログインが必要です。ログイン後、招待コードを入力すると全ページ閲覧できます。
+                    {isLoggedIn
+                      ? `このスライドの全${pageCount}ページを閲覧するには、マイページの「招待コード」からコードを入力してください。招待コードには有効期限があります。`
+                      : `このスライドの全${pageCount}ページを閲覧するにはログインが必要です。ログイン後、招待コードを入力すると全ページ閲覧できます。`}
                   </p>
                   <Link
-                    href="/login"
+                    href={isLoggedIn ? "/mypage/invite-codes" : "/login"}
                     className="rounded-lg px-6 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
                     style={{
                       background: "var(--btn-primary-bg)",
                       color: "var(--btn-primary-fg)",
                     }}
                   >
-                    ログイン
+                    {isLoggedIn ? "招待コードを入力" : "ログイン"}
                   </Link>
                 </div>
               )}

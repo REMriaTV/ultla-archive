@@ -101,14 +101,16 @@ export default function AdminPage() {
     description: string | null;
     max_uses: number;
     used_count: number;
+    default_expires_at: string | null;
     slide_ids: string[];
   }>>([]);
   const [loadingInviteCodes, setLoadingInviteCodes] = useState(false);
   const [creatingInviteCode, setCreatingInviteCode] = useState(false);
-  const [inviteCodeForm, setInviteCodeForm] = useState({ code: "", name: "", description: "", slide_ids: [] as string[] });
+  const [inviteCodeForm, setInviteCodeForm] = useState({ code: "", name: "", description: "", default_expires_at: "", slide_ids: [] as string[] });
   const [editingInviteCode, setEditingInviteCode] = useState<typeof inviteCodes[0] | null>(null);
-  const [inviteCodeEditForm, setInviteCodeEditForm] = useState({ name: "", description: "", slide_ids: [] as string[] });
+  const [inviteCodeEditForm, setInviteCodeEditForm] = useState({ name: "", description: "", default_expires_at: "", slide_ids: [] as string[] });
   const [savingInviteCode, setSavingInviteCode] = useState(false);
+  const [applyingExpiryId, setApplyingExpiryId] = useState<string | null>(null);
 
   const [siteSettingsSubtitle, setSiteSettingsSubtitle] = useState("");
   const [siteSettingsFooterText, setSiteSettingsFooterText] = useState("");
@@ -303,6 +305,9 @@ export default function AdminPage() {
     }
     setSavingInviteCode(true);
     try {
+      const defaultExpiresAt = inviteCodeForm.default_expires_at.trim()
+        ? `${inviteCodeForm.default_expires_at.trim()}T23:59:59.000Z`
+        : null;
       const res = await fetch("/api/admin/invite-codes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -310,13 +315,14 @@ export default function AdminPage() {
           code: inviteCodeForm.code.trim().toLowerCase().replace(/\s+/g, "-"),
           name: inviteCodeForm.name.trim() || null,
           description: inviteCodeForm.description.trim() || null,
+          default_expires_at: defaultExpiresAt,
           slide_ids: inviteCodeForm.slide_ids,
         }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "作成失敗");
       setCreatingInviteCode(false);
-      setInviteCodeForm({ code: "", name: "", description: "", slide_ids: [] });
+      setInviteCodeForm({ code: "", name: "", description: "", default_expires_at: "", slide_ids: [] });
       loadInviteCodes();
     } catch (err) {
       alert(err instanceof Error ? err.message : "招待コードの作成に失敗しました");
@@ -330,12 +336,16 @@ export default function AdminPage() {
     if (!editingInviteCode) return;
     setSavingInviteCode(true);
     try {
+      const defaultExpiresAt = inviteCodeEditForm.default_expires_at.trim()
+        ? `${inviteCodeEditForm.default_expires_at.trim()}T23:59:59.000Z`
+        : null;
       const res = await fetch(`/api/admin/invite-codes/${editingInviteCode.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: inviteCodeEditForm.name.trim() || null,
           description: inviteCodeEditForm.description.trim() || null,
+          default_expires_at: defaultExpiresAt,
           slide_ids: inviteCodeEditForm.slide_ids,
         }),
       });
@@ -359,6 +369,22 @@ export default function AdminPage() {
       loadInviteCodes();
     } catch (err) {
       alert(err instanceof Error ? err.message : "招待コードの削除に失敗しました");
+    }
+  }
+
+  async function handleApplyExpiry(inviteCodeId: string) {
+    if (!confirm("この招待コードの「既定の有効期限」を、既に登録済みの全ユーザーに一括適用しますか？")) return;
+    setApplyingExpiryId(inviteCodeId);
+    try {
+      const res = await fetch(`/api/admin/invite-codes/${inviteCodeId}/apply-expiry`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "一括適用に失敗しました");
+      alert(json.message ?? "一括適用しました");
+      loadInviteCodes();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "一括適用に失敗しました");
+    } finally {
+      setApplyingExpiryId(null);
     }
   }
 
@@ -504,6 +530,12 @@ export default function AdminPage() {
       alert("PDFファイルを選択してください");
       return;
     }
+    const fourMB = 4 * 1024 * 1024;
+    if (file.size > fourMB) {
+      if (!confirm(`PDFが約4MBを超えています（${(file.size / 1024 / 1024).toFixed(1)}MB）。本番では約4.5MBの制限で失敗することがあります。続行しますか？`)) {
+        return;
+      }
+    }
 
     setExtractingCaption(true);
     try {
@@ -515,15 +547,28 @@ export default function AdminPage() {
         method: "POST",
         body: formData,
       });
-      const json = await res.json();
+      const text = await res.text();
+      let json: { error?: string; message?: string; details?: string; caption?: string };
+      try {
+        json = text ? JSON.parse(text) : {};
+      } catch {
+        if (res.status === 413) {
+          json = {
+            error: "PDFが大きすぎます",
+            message: "本番環境ではリクエストサイズの制限（約4.5MB）があります。PDFを小さくするか、キャプションを手動で入力してください。",
+          };
+        } else {
+          json = { error: "レスポンスの解析に失敗しました", details: `HTTP ${res.status}` };
+        }
+      }
 
       if (!res.ok) {
-        alert(`抽出失敗: ${json.error}\n${json.message ?? json.details ?? ""}`);
+        alert(`抽出失敗: ${json.error ?? "エラー"}\n${json.message ?? json.details ?? ""}`);
         return;
       }
 
       if (json.caption) {
-        setCreateForm((f) => ({ ...f, caption: json.caption }));
+        setCreateForm((f) => ({ ...f, caption: json.caption ?? f.caption }));
         alert(json.message ?? "キャプションを生成しました");
       }
     } catch (err) {
@@ -1241,7 +1286,7 @@ export default function AdminPage() {
               type="button"
               onClick={() => {
                 setCreatingInviteCode(true);
-                setInviteCodeForm({ code: "", name: "", description: "", slide_ids: [] });
+                setInviteCodeForm({ code: "", name: "", description: "", default_expires_at: "", slide_ids: [] });
               }}
               className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
             >
@@ -1260,6 +1305,7 @@ export default function AdminPage() {
                   <tr>
                     <th className="px-4 py-3 font-medium text-neutral-700">コード</th>
                     <th className="px-4 py-3 font-medium text-neutral-700">名前</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">有効期限（既定）</th>
                     <th className="px-4 py-3 font-medium text-neutral-700">紐づけスライド数</th>
                     <th className="px-4 py-3 font-medium text-neutral-700">使用数</th>
                     <th className="w-28 px-4 py-3 font-medium text-neutral-700">操作</th>
@@ -1270,6 +1316,14 @@ export default function AdminPage() {
                     <tr key={ic.id} className="border-b border-neutral-100 last:border-0">
                       <td className="px-4 py-3 font-mono text-neutral-800">{ic.code}</td>
                       <td className="px-4 py-3 text-neutral-600">{ic.name || "—"}</td>
+                      <td className="px-4 py-3 text-neutral-600">
+                        {ic.default_expires_at
+                          ? (() => {
+                              const d = ic.default_expires_at.slice(0, 10);
+                              return `${d.replace(/-/g, "/")}`;
+                            })()
+                          : "—"}
+                      </td>
                       <td className="px-4 py-3 text-neutral-600">{ic.slide_ids?.length ?? 0}件</td>
                       <td className="px-4 py-3 text-neutral-600">{ic.used_count} / {ic.max_uses}</td>
                       <td className="px-4 py-3">
@@ -1281,6 +1335,7 @@ export default function AdminPage() {
                               setInviteCodeEditForm({
                                 name: ic.name ?? "",
                                 description: ic.description ?? "",
+                                default_expires_at: ic.default_expires_at ? ic.default_expires_at.slice(0, 10) : "",
                                 slide_ids: ic.slide_ids ?? [],
                               });
                             }}
@@ -1338,6 +1393,15 @@ export default function AdminPage() {
                   value={inviteCodeForm.description}
                   onChange={(e) => setInviteCodeForm((f) => ({ ...f, description: e.target.value }))}
                   placeholder="備考"
+                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">有効期限（任意・未設定なら付与から1ヶ月）</label>
+                <input
+                  type="date"
+                  value={inviteCodeForm.default_expires_at}
+                  onChange={(e) => setInviteCodeForm((f) => ({ ...f, default_expires_at: e.target.value }))}
                   className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
                 />
               </div>
@@ -1408,6 +1472,15 @@ export default function AdminPage() {
                     />
                   </div>
                   <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">有効期限（任意・未設定なら付与から1ヶ月）</label>
+                    <input
+                      type="date"
+                      value={inviteCodeEditForm.default_expires_at}
+                      onChange={(e) => setInviteCodeEditForm((f) => ({ ...f, default_expires_at: e.target.value }))}
+                      className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                    />
+                  </div>
+                  <div>
                     <label className="mb-1 block text-xs font-medium text-neutral-600">紐づけるスライド（チェックで選択）</label>
                     <div className="max-h-48 overflow-y-auto rounded border border-neutral-200 bg-white p-2">
                       {slides.map((s) => (
@@ -1428,6 +1501,18 @@ export default function AdminPage() {
                       ))}
                     </div>
                   </div>
+                  {editingInviteCode.default_expires_at && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyExpiry(editingInviteCode.id)}
+                        disabled={applyingExpiryId === editingInviteCode.id}
+                        className="rounded border border-amber-600 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                      >
+                        {applyingExpiryId === editingInviteCode.id ? "適用中..." : "既存の登録ユーザーにこの期限を一括適用"}
+                      </button>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <button
                       type="submit"
