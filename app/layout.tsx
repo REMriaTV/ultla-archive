@@ -7,7 +7,6 @@ import { HeaderSearch } from "@/components/HeaderSearch";
 import { InviteGrantChecker } from "@/components/InviteGrantChecker";
 import { LoggedInSidebarLayout } from "@/components/LoggedInSidebarLayout";
 import { MobileSidebarMenu } from "@/components/MobileSidebarMenu";
-import { SiteFooter } from "@/components/SiteFooter";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -85,10 +84,7 @@ export default async function RootLayout({
         </header>
         <InviteGrantChecker />
         <div className="flex min-h-screen flex-col">
-          <div className="min-h-0 flex-1 flex">
-            <LoggedInSidebarLayout>{children}</LoggedInSidebarLayout>
-          </div>
-          <SiteFooter />
+          <LoggedInSidebarLayout>{children}</LoggedInSidebarLayout>
         </div>
       </body>
     </html>
