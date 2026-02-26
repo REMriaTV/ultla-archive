@@ -9,6 +9,7 @@ const SETTINGS_NAV = [
   { label: "マイリスト", href: "/mypage/mylist" },
   { label: "招待コード", href: "/mypage/invite-codes" },
   { label: "設定", href: "/mypage/settings" },
+  { label: "お問い合わせ", href: "/mypage/contact" },
 ] as const;
 
 interface GenreTypeRow {

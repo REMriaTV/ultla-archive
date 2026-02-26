@@ -119,12 +119,28 @@ export default function AdminPage() {
   const [heroSlideIds, setHeroSlideIds] = useState<string[]>([]);
   const [savingSiteSettings, setSavingSiteSettings] = useState(false);
 
+  const [inquiries, setInquiries] = useState<Array<{
+    id: string;
+    user_id: string | null;
+    name: string;
+    email: string;
+    subject: string;
+    body: string;
+    created_at: string;
+    read_at: string | null;
+  }>>([]);
+  const [loadingInquiries, setLoadingInquiries] = useState(false);
+  const [selectedInquiry, setSelectedInquiry] = useState<typeof inquiries[0] | null>(null);
+  const [replyForm, setReplyForm] = useState({ subject: "", body: "" });
+  const [sendingReply, setSendingReply] = useState(false);
+
   useEffect(() => {
     loadSlides();
     loadPrograms();
     loadGenreTypes();
     loadInviteCodes();
     loadSiteSettings();
+    loadInquiries();
   }, []);
 
   async function loadSiteSettings() {
@@ -167,6 +183,60 @@ export default function AdminPage() {
       alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSavingSiteSettings(false);
+    }
+  }
+
+  async function loadInquiries() {
+    setLoadingInquiries(true);
+    try {
+      const res = await fetch("/api/admin/inquiries");
+      const data = await res.json();
+      if (res.ok && Array.isArray(data)) setInquiries(data);
+    } catch {
+      console.error("お問い合わせ一覧読み込み失敗");
+    } finally {
+      setLoadingInquiries(false);
+    }
+  }
+
+  async function openInquiryDetail(inq: typeof inquiries[0]) {
+    setSelectedInquiry(inq);
+    setReplyForm({
+      subject: inq.subject.startsWith("Re:") ? inq.subject : `Re: ${inq.subject}`,
+      body: "",
+    });
+    if (!inq.read_at) {
+      try {
+        await fetch(`/api/admin/inquiries/${encodeURIComponent(inq.id)}`, { method: "PATCH" });
+        setInquiries((prev) => prev.map((i) => (i.id === inq.id ? { ...i, read_at: new Date().toISOString() } : i)));
+      } catch {
+        // 既読更新失敗は無視
+      }
+    }
+  }
+
+  async function handleReplySubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedInquiry) return;
+    setSendingReply(true);
+    try {
+      const res = await fetch(`/api/admin/inquiries/${encodeURIComponent(selectedInquiry.id)}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: replyForm.subject, body: replyForm.body }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error ?? "返信の送信に失敗しました");
+        return;
+      }
+      alert("返信を送信しました");
+      setSelectedInquiry(null);
+      loadInquiries();
+    } catch (err) {
+      alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSendingReply(false);
     }
   }
 
@@ -1534,6 +1604,136 @@ export default function AdminPage() {
             </div>
           )}
         </section>
+
+        {/* お問い合わせ管理 */}
+        <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
+          <h2 className="mb-4 text-lg font-semibold text-neutral-800">お問い合わせ管理</h2>
+          <p className="mb-4 text-sm text-neutral-600">
+            ユーザーからのお問い合わせ一覧です。行をクリックして詳細を表示し、返信できます。
+          </p>
+          {loadingInquiries ? (
+            <p className="text-sm text-neutral-500">読み込み中...</p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-neutral-200">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-neutral-200 bg-neutral-50">
+                  <tr>
+                    <th className="px-4 py-3 font-medium text-neutral-700">受信日時</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">お名前</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">メール</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">件名</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">状態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inquiries.map((inq) => (
+                    <tr
+                      key={inq.id}
+                      className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                      onClick={() => openInquiryDetail(inq)}
+                    >
+                      <td className="px-4 py-3 text-neutral-600">
+                        {new Date(inq.created_at).toLocaleString("ja-JP")}
+                      </td>
+                      <td className="px-4 py-3 text-neutral-800">{inq.name}</td>
+                      <td className="px-4 py-3 text-neutral-600">{inq.email}</td>
+                      <td className="max-w-[200px] truncate px-4 py-3 text-neutral-600" title={inq.subject}>
+                        {inq.subject}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={
+                            inq.read_at
+                              ? "rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600"
+                              : "rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800"
+                          }
+                        >
+                          {inq.read_at ? "既読" : "未読"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {inquiries.length === 0 && !loadingInquiries && (
+            <p className="mt-3 text-sm text-neutral-500">お問い合わせはまだありません。</p>
+          )}
+        </section>
+
+        {/* お問い合わせ詳細・返信モーダル */}
+        {selectedInquiry && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" role="dialog">
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-neutral-200 bg-white p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-neutral-800">お問い合わせ詳細</h3>
+                <button
+                  type="button"
+                  onClick={() => setSelectedInquiry(null)}
+                  className="rounded border border-neutral-300 bg-white p-2 text-neutral-600 hover:bg-neutral-50"
+                  aria-label="閉じる"
+                >
+                  ×
+                </button>
+              </div>
+              <dl className="mb-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                <dt className="text-neutral-500">お名前</dt>
+                <dd className="text-neutral-800">{selectedInquiry.name}</dd>
+                <dt className="text-neutral-500">メール</dt>
+                <dd className="text-neutral-800">{selectedInquiry.email}</dd>
+                <dt className="text-neutral-500">受信日時</dt>
+                <dd className="text-neutral-800">{new Date(selectedInquiry.created_at).toLocaleString("ja-JP")}</dd>
+                <dt className="text-neutral-500">件名</dt>
+                <dd className="text-neutral-800">{selectedInquiry.subject}</dd>
+                <dt className="text-neutral-500">本文</dt>
+                <dd className="col-span-2 whitespace-pre-wrap rounded border border-neutral-200 bg-neutral-50 p-3 text-neutral-800">
+                  {selectedInquiry.body}
+                </dd>
+              </dl>
+              <form onSubmit={handleReplySubmit} className="space-y-4 border-t border-neutral-200 pt-4">
+                <h4 className="text-sm font-semibold text-neutral-700">返信</h4>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-600">件名</label>
+                  <input
+                    type="text"
+                    value={replyForm.subject}
+                    onChange={(e) => setReplyForm((f) => ({ ...f, subject: e.target.value }))}
+                    required
+                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-600">本文</label>
+                  <textarea
+                    value={replyForm.body}
+                    onChange={(e) => setReplyForm((f) => ({ ...f, body: e.target.value }))}
+                    required
+                    rows={6}
+                    placeholder="返信内容を入力してください"
+                    className="w-full resize-y rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={sendingReply}
+                    className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                  >
+                    {sendingReply ? "送信中..." : "返信を送信"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedInquiry(null)}
+                    className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                  >
+                    閉じる
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* 新規スライド作成（完全自動） */}
         <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
