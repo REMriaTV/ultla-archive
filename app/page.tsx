@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ExpandedSlideProvider } from "@/components/ExpandedSlideContext";
+import { GuestBanner } from "@/components/GuestBanner";
 import { HeroSlides } from "@/components/HeroSlides";
 import { InviteSeriesShelf, MylistShelf, ProgramShelf } from "@/components/ProgramShelf";
 import { SearchSection } from "@/components/SearchSection";
@@ -170,6 +171,7 @@ export default async function Home(props: HomeProps) {
 
       <div className="mx-auto w-full max-w-4xl flex-1 min-w-0">
       <main className="px-6 py-6">
+        <GuestBanner />
         {latestAnnouncement && (
           <Link
             href="/mypage/announcements"
