@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import { stripMarkdownForPreview } from "@/components/AnnouncementMarkdown";
 
 type Announcement = {
   id: string;
@@ -12,13 +14,17 @@ type Announcement = {
 export function AnnouncementsList() {
   const [list, setList] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/announcements")
       .then((res) => (res.ok ? res.json() : []))
-      .then((data) => setList(Array.isArray(data) ? data : []))
-      .catch(() => setList([]))
+      .then((data) => {
+        const arr: Announcement[] = Array.isArray(data) ? data : [];
+        setList(arr);
+      })
+      .catch(() => {
+        setList([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -46,11 +52,11 @@ export function AnnouncementsList() {
   return (
     <ul className="space-y-3">
       {list.map((a) => {
-        const isExpanded = expandedId === a.id;
+        const plainBody = stripMarkdownForPreview(a.body);
         const preview =
-          a.body.length <= previewLength
-            ? a.body
-            : a.body.slice(0, previewLength) + "…";
+          plainBody.length <= previewLength
+            ? plainBody
+            : plainBody.slice(0, previewLength) + "…";
 
         return (
           <li
@@ -58,30 +64,21 @@ export function AnnouncementsList() {
             className="rounded-lg border overflow-hidden"
             style={{ borderColor: "var(--border)", background: "var(--card)" }}
           >
-            <button
-              type="button"
-              onClick={() => setExpandedId(isExpanded ? null : a.id)}
-              className="w-full px-4 py-3 text-left hover:opacity-90 transition-opacity"
+            <Link
+              href={`/mypage/announcements/${encodeURIComponent(a.id)}`}
+              className="block px-4 py-3 hover:opacity-90 transition-opacity"
               style={{ color: "var(--fg)" }}
             >
-              <span className="font-medium">{a.title}</span>
-              <span className="ml-2 text-sm" style={{ color: "var(--fg-muted)" }}>
-                {new Date(a.published_at).toLocaleDateString("ja-JP")}
-              </span>
-              {!isExpanded && (
-                <p className="mt-1 text-sm line-clamp-2" style={{ color: "var(--fg-muted)" }}>
-                  {preview}
-                </p>
-              )}
-            </button>
-            {isExpanded && (
-              <div
-                className="border-t px-4 py-3 text-sm whitespace-pre-wrap"
-                style={{ borderColor: "var(--border)", color: "var(--fg-muted)" }}
-              >
-                {a.body}
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="font-medium">{a.title}</span>
+                <span className="text-sm" style={{ color: "var(--fg-muted)" }}>
+                  {new Date(a.published_at).toLocaleDateString("ja-JP")}
+                </span>
               </div>
-            )}
+              <p className="mt-1 text-sm line-clamp-2" style={{ color: "var(--fg-muted)" }}>
+                {preview}
+              </p>
+            </Link>
           </li>
         );
       })}

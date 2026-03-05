@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { KeywordTagInput } from "@/components/KeywordTagInput";
+import { AnnouncementMarkdown } from "@/components/AnnouncementMarkdown";
 
 type SlideVisibility = "free" | "invite_only" | "private";
+type ContentTier = "basic" | "pro" | "advance";
 
 const VISIBILITY_LABELS: Record<SlideVisibility, string> = {
   free: "公開（未ログインでも一覧・4枚まで）",
@@ -20,6 +22,12 @@ const VISIBILITY_SHORT: Record<SlideVisibility, string> = {
   private: "非公開",
 };
 
+const CONTENT_TIER_LABELS: Record<ContentTier, string> = {
+  basic: "BASIC",
+  pro: "PRO",
+  advance: "ADVANCE",
+};
+
 interface SlideRow {
   id: string;
   title: string;
@@ -31,6 +39,7 @@ interface SlideRow {
   keyword_tags: string[];
   caption: string | null;
   visibility?: SlideVisibility;
+  content_tier?: ContentTier | null;
 }
 
 interface GenreTypeRow {
@@ -63,6 +72,7 @@ export default function AdminPage() {
     keyword_tags: "",
     caption: "",
     visibility: "private" as SlideVisibility,
+    content_tier: "basic" as ContentTier,
   });
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -74,6 +84,7 @@ export default function AdminPage() {
     year: "",
     caption: "",
     visibility: "free" as SlideVisibility,
+    content_tier: "basic" as ContentTier,
   });
   const [keywordTags, setKeywordTags] = useState<string[]>([]);
   const [editingProgram, setEditingProgram] = useState<Program | null>(null);
@@ -149,6 +160,8 @@ export default function AdminPage() {
   const [editingAnnouncement, setEditingAnnouncement] = useState<typeof announcements[0] | null>(null);
   const [announcementEditForm, setAnnouncementEditForm] = useState({ title: "", body: "", is_published: true });
   const [savingAnnouncement, setSavingAnnouncement] = useState(false);
+  const [announcementBodyTab, setAnnouncementBodyTab] = useState<"edit" | "preview">("edit");
+  const [announcementEditBodyTab, setAnnouncementEditBodyTab] = useState<"edit" | "preview">("edit");
 
   useEffect(() => {
     loadSlides();
@@ -604,7 +617,7 @@ export default function AdminPage() {
   async function loadSlides() {
     const { data, error } = await supabase
       .from("slides")
-      .select("id, title, program_id, pdf_url, page_count, page_image_urls, year, keyword_tags, caption, visibility")
+      .select("id, title, program_id, pdf_url, page_count, page_image_urls, year, keyword_tags, caption, visibility, content_tier")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -635,6 +648,7 @@ export default function AdminPage() {
       if (keywordTags.length > 0) formData.append("keyword_tags", keywordTags.join(", "));
       if (createForm.caption) formData.append("caption", createForm.caption);
       formData.append("visibility", createForm.visibility);
+      formData.append("content_tier", createForm.content_tier);
 
       const res = await fetch("/api/slides/create", {
         method: "POST",
@@ -648,7 +662,7 @@ export default function AdminPage() {
       }
 
       alert(`作成完了: ${json.pageCount}ページ`);
-      setCreateForm({ title: "", program_id: "", year: "", caption: "", visibility: "free" });
+      setCreateForm({ title: "", program_id: "", year: "", caption: "", visibility: "free", content_tier: "basic" });
       setKeywordTags([]);
       fileInput.value = "";
       loadSlides();
@@ -790,6 +804,7 @@ export default function AdminPage() {
       keyword_tags: Array.isArray(tags) ? tags.join(", ") : "",
       caption: slide.caption ?? "",
       visibility: (slide.visibility as SlideVisibility) || "private",
+      content_tier: (slide.content_tier as ContentTier) || "basic",
     });
   }
 
@@ -812,6 +827,7 @@ export default function AdminPage() {
           keyword_tags: tags,
           caption: editForm.caption.trim() || null,
           visibility: editForm.visibility,
+          content_tier: editForm.content_tier,
         }),
       });
       const json = await res.json();
@@ -873,6 +889,20 @@ export default function AdminPage() {
               >
                 使い方ガイド
               </Link>
+              <Link
+                href="/admin/business-guide"
+                className="shrink-0 text-sm hover:opacity-80"
+                style={{ color: "var(--fg-muted)" }}
+              >
+                ビジネス・戦略ガイド
+              </Link>
+              <a
+                href="#admin-announcements"
+                className="shrink-0 text-sm hover:opacity-80"
+                style={{ color: "var(--fg-muted)" }}
+              >
+                お知らせ
+              </a>
               <h1 className="shrink-0 text-xl font-bold" style={{ color: "var(--fg)" }}>
                 管理画面
               </h1>
@@ -1716,7 +1746,10 @@ export default function AdminPage() {
         </section>
 
         {/* お知らせ管理 */}
-        <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
+        <section
+          id="admin-announcements"
+          className="mb-12 rounded-lg border border-neutral-200 bg-white p-6"
+        >
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-neutral-800">お知らせ管理</h2>
             <button
@@ -1820,15 +1853,53 @@ export default function AdminPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600">本文 *</label>
-                <textarea
-                  value={announcementForm.body}
-                  onChange={(e) => setAnnouncementForm((f) => ({ ...f, body: e.target.value }))}
-                  rows={5}
-                  placeholder="お知らせ本文"
-                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
-                  required
-                />
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="block text-xs font-medium text-neutral-600">本文 *</label>
+                  <div className="flex gap-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setAnnouncementBodyTab("edit")}
+                      className={`rounded px-2 py-1 ${
+                        announcementBodyTab === "edit"
+                          ? "bg-neutral-800 text-white"
+                          : "bg-white text-neutral-600 border border-neutral-300"
+                      }`}
+                    >
+                      編集
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnnouncementBodyTab("preview")}
+                      className={`rounded px-2 py-1 ${
+                        announcementBodyTab === "preview"
+                          ? "bg-neutral-800 text-white"
+                          : "bg-white text-neutral-600 border border-neutral-300"
+                      }`}
+                    >
+                      プレビュー
+                    </button>
+                  </div>
+                </div>
+                {announcementBodyTab === "edit" ? (
+                  <textarea
+                    value={announcementForm.body}
+                    onChange={(e) => setAnnouncementForm((f) => ({ ...f, body: e.target.value }))}
+                    rows={7}
+                    placeholder="Markdown 形式でお知らせ本文を入力できます（## 見出し, - 箇条書き, **太字**, > 引用 など）。"
+                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                    required
+                  />
+                ) : (
+                  <div className="w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800">
+                    {announcementForm.body.trim() ? (
+                      <AnnouncementMarkdown body={announcementForm.body} />
+                    ) : (
+                      <p className="text-xs text-neutral-500">
+                        本文を入力するとここにプレビューが表示されます。
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -1891,14 +1962,52 @@ export default function AdminPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-neutral-600">本文 *</label>
-                    <textarea
-                      value={announcementEditForm.body}
-                      onChange={(e) => setAnnouncementEditForm((f) => ({ ...f, body: e.target.value }))}
-                      rows={6}
-                      className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
-                      required
-                    />
+                    <div className="mb-1 flex items-center justify-between">
+                      <label className="block text-xs font-medium text-neutral-600">本文 *</label>
+                      <div className="flex gap-1 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setAnnouncementEditBodyTab("edit")}
+                          className={`rounded px-2 py-1 ${
+                            announcementEditBodyTab === "edit"
+                              ? "bg-neutral-800 text-white"
+                              : "bg-white text-neutral-600 border border-neutral-300"
+                          }`}
+                        >
+                          編集
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAnnouncementEditBodyTab("preview")}
+                          className={`rounded px-2 py-1 ${
+                            announcementEditBodyTab === "preview"
+                              ? "bg-neutral-800 text-white"
+                              : "bg-white text-neutral-600 border border-neutral-300"
+                          }`}
+                        >
+                          プレビュー
+                        </button>
+                      </div>
+                    </div>
+                    {announcementEditBodyTab === "edit" ? (
+                      <textarea
+                        value={announcementEditForm.body}
+                        onChange={(e) => setAnnouncementEditForm((f) => ({ ...f, body: e.target.value }))}
+                        rows={8}
+                        className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                        required
+                      />
+                    ) : (
+                      <div className="w-full rounded border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800">
+                        {announcementEditForm.body.trim() ? (
+                          <AnnouncementMarkdown body={announcementEditForm.body} />
+                        ) : (
+                          <p className="text-xs text-neutral-500">
+                            本文を入力するとここにプレビューが表示されます。
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -2154,6 +2263,25 @@ export default function AdminPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-neutral-700">
+                コンテンツ階層
+              </label>
+              <select
+                value={createForm.content_tier}
+                onChange={(e) =>
+                  setCreateForm((f) => ({ ...f, content_tier: e.target.value as ContentTier }))
+                }
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+              >
+                {(Object.keys(CONTENT_TIER_LABELS) as ContentTier[]).map((t) => (
+                  <option key={t} value={t}>{CONTENT_TIER_LABELS[t]}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-neutral-500">
+                BASIC=サブスクでフル閲覧、PRO=レンタル/購入、ADVANCE=一括閲覧
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-neutral-700">
                 キャプション（任意）
               </label>
               <p className="mb-2 text-xs text-neutral-500">
@@ -2244,6 +2372,9 @@ export default function AdminPage() {
                       公開レベル
                     </th>
                     <th className="px-4 py-3 font-medium text-neutral-700">
+                      コンテンツ階層
+                    </th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">
                       状態
                     </th>
                     <th className="px-4 py-3 font-medium text-neutral-700">
@@ -2280,6 +2411,9 @@ export default function AdminPage() {
                         >
                           {VISIBILITY_SHORT[(slide.visibility as SlideVisibility) || "private"]}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-neutral-600">
+                        {CONTENT_TIER_LABELS[(slide.content_tier as ContentTier) || "basic"]}
                       </td>
                       <td className="px-4 py-3">
                         {slide.page_image_urls?.length ? (
@@ -2416,6 +2550,22 @@ export default function AdminPage() {
                   >
                     {(Object.keys(VISIBILITY_LABELS) as SlideVisibility[]).map((v) => (
                       <option key={v} value={v}>{VISIBILITY_LABELS[v]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-neutral-700">
+                    コンテンツ階層
+                  </label>
+                  <select
+                    value={editForm.content_tier}
+                    onChange={(e) =>
+                      setEditForm((f) => ({ ...f, content_tier: e.target.value as ContentTier }))
+                    }
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+                  >
+                    {(Object.keys(CONTENT_TIER_LABELS) as ContentTier[]).map((t) => (
+                      <option key={t} value={t}>{CONTENT_TIER_LABELS[t]}</option>
                     ))}
                   </select>
                 </div>

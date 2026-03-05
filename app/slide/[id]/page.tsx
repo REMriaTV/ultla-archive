@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { MylistButton, MylistLoginPrompt } from "@/components/MylistButton";
 import { NoRightClick } from "@/components/NoRightClick";
 import { SlideImageViewer } from "@/components/SlideImageViewer";
-import { getAccessContext, canViewSlide } from "@/lib/access";
+import { getAccessContext, canViewSlide, hasFullAccessToSlide } from "@/lib/access";
 
 interface SlideDetailPageProps {
   params: Promise<{ id: string }>;
@@ -33,14 +33,14 @@ export default async function SlideDetailPage({ params }: SlideDetailPageProps) 
   }
 
   const plan = accessCtx.plan;
-  const isPremium = plan === "premium";
+  const isPremium = plan === "premium" || plan === "advance";
   const isAdmin = accessCtx.isAdmin;
 
-  // 管理者・premium または 招待コードに紐づくスライド = 全ページ、それ以外 = 4ページ
+  // 管理者・有料プラン（advance/premium）・招待コード紐づき、または plan+content_tier で全ページ可
   const hasFullAccess =
     isAdmin ||
     isPremium ||
-    (accessCtx.accessibleSlideIds !== null && accessCtx.accessibleSlideIds.has(String(slide.id)));
+    hasFullAccessToSlide(slide, accessCtx);
 
   const freePreviewPageCount = hasFullAccess ? (slide.page_count ?? 999) : 4;
 

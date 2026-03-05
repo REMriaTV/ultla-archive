@@ -8,6 +8,7 @@ const SETTINGS_NAV = [
   { label: "アカウント情報", href: "/mypage/account" },
   { label: "マイリスト", href: "/mypage/mylist" },
   { label: "招待コード", href: "/mypage/invite-codes" },
+  { label: "プラン登録", href: "/mypage/subscription" },
   { label: "設定", href: "/mypage/settings" },
   { label: "お問い合わせ", href: "/mypage/contact" },
   { label: "お知らせ", href: "/mypage/announcements" },

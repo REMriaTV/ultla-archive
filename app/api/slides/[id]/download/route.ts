@@ -31,11 +31,11 @@ export async function GET(
     .eq("id", user.id)
     .single();
 
-  const isPremium = profile?.plan === "premium";
+  const isPremium = profile?.plan === "premium" || profile?.plan === "advance";
   const isAdmin = profile?.is_admin === true;
   if (!isPremium && !isAdmin) {
     return NextResponse.json(
-      { error: "この機能はプレミアムプランまたは管理者限定です" },
+      { error: "この機能はADVANCEプランまたは管理者限定です" },
       { status: 403 }
     );
   }

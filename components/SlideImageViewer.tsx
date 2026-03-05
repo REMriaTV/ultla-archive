@@ -33,7 +33,7 @@ export function SlideImageViewer({
       className="space-y-4"
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* プレミアムまたは管理者: PDF ダウンロードボタン */}
+      {/* ADVANCE または管理者: PDF ダウンロードボタン */}
       {slideId && pdfUrl && canDownloadPdf && (
         <div className="flex flex-col items-end gap-1">
           <a
@@ -45,7 +45,7 @@ export function SlideImageViewer({
           </a>
           {isPremium && (
             <p className="text-xs" style={{ color: "var(--fg-muted)" }}>
-              ※プレミアムプラン（有料）限定の機能です
+              ※ADVANCE プラン（有料）限定の機能です
             </p>
           )}
         </div>

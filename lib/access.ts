@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+export type Plan = "free" | "basic" | "pro" | "advance" | "premium";
+
 export interface AccessContext {
   userId: string | null;
-  plan: "free" | "premium";
-  /** 有効期限内の招待コードに紐づくスライドID一覧。premium の場合は null（全件可） */
+  plan: Plan;
+  /** 有効期限内の招待コードに紐づくスライドID一覧。premium/advance 等の場合は null（プランで制御） */
   accessibleSlideIds: Set<string> | null;
   /** 管理者（管理画面・PDFダウンロード可） */
   isAdmin: boolean;
@@ -33,11 +35,12 @@ export async function getAccessContext(
     .eq("id", user.id)
     .single();
 
-  const plan = (profile?.plan as "free" | "premium") ?? "free";
+  const plan = (profile?.plan as Plan) ?? "basic";
   const isAdmin = profile?.is_admin === true;
 
-  if (plan === "premium") {
-    return { userId: user.id, plan: "premium", accessibleSlideIds: null, isAdmin };
+  // advance / premium は全スライド閲覧のため accessibleSlideIds を null
+  if (plan === "premium" || plan === "advance") {
+    return { userId: user.id, plan, accessibleSlideIds: null, isAdmin };
   }
 
   const { data: userCodes } = await supabase
@@ -48,11 +51,11 @@ export async function getAccessContext(
 
   const codeIds = (userCodes ?? []).map((r) => r.invite_code_id);
   if (codeIds.length === 0) {
-    return { userId: user.id, plan: "free", accessibleSlideIds: new Set(), isAdmin };
+    return { userId: user.id, plan: "basic", accessibleSlideIds: new Set(), isAdmin };
   }
 
   if (!supabaseAdmin) {
-    return { userId: user.id, plan: "free", accessibleSlideIds: new Set(), isAdmin };
+    return { userId: user.id, plan: "basic", accessibleSlideIds: new Set(), isAdmin };
   }
 
   const { data: links } = await supabaseAdmin
@@ -61,7 +64,23 @@ export async function getAccessContext(
     .in("invite_code_id", codeIds);
 
   const ids = new Set((links ?? []).map((r) => String(r.slide_id)));
-  return { userId: user.id, plan: "free", accessibleSlideIds: ids, isAdmin };
+  return { userId: user.id, plan: "basic", accessibleSlideIds: ids, isAdmin };
+}
+
+/** スライドの全ページを閲覧可能か（4枚制限を超えられるか） */
+export function hasFullAccessToSlide(
+  slide: { id: string | number; content_tier?: string | null },
+  ctx: AccessContext
+): boolean {
+  if (ctx.isAdmin) return true;
+  // 有料プラン: content_tier に応じて付与
+  const tier = slide.content_tier ?? "basic";
+  if (ctx.plan === "premium" || ctx.plan === "advance") return true;
+  if (ctx.plan === "pro" && (tier === "basic" || tier === "pro")) return true;
+  if (ctx.plan === "basic" && tier === "basic") return true;
+  // 招待コードで紐づいている場合は全ページ可
+  if (ctx.accessibleSlideIds !== null && ctx.accessibleSlideIds.has(String(slide.id))) return true;
+  return false;
 }
 
 /** スライドがユーザーに表示可能か（管理者は招待コードに関係なく全スライド可） */
@@ -72,7 +91,7 @@ export function canViewSlide(
   if (ctx.isAdmin) return true;
   const vis = slide.visibility ?? "private";
   if (vis === "free") return true;
-  if (ctx.accessibleSlideIds === null) return true; // premium
+  if (ctx.accessibleSlideIds === null) return true; // 有料プラン（一覧は canViewSlide で visibility ベース、ここでは full access は hasFullAccessToSlide で判定）
   if (vis === "invite_only" && ctx.accessibleSlideIds.has(String(slide.id))) return true;
   return false;
 }

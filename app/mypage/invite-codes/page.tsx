@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { SubscriptionSignupBanner } from "@/components/SubscriptionSignupBanner";
 import { InviteCodeList } from "./InviteCodeList";
 import { InviteCodeForm } from "./InviteCodeForm";
 
@@ -39,6 +40,9 @@ export default async function MypageInviteCodesPage() {
       });
   }
 
+  const now = new Date();
+  const hasValidCodes = items.some((item) => new Date(item.expires_at) > now);
+
   return (
     <div className="mx-auto max-w-2xl">
       <h1
@@ -55,6 +59,11 @@ export default async function MypageInviteCodesPage() {
       </p>
       <InviteCodeForm className="mb-6" />
       <InviteCodeList items={items} />
+      {!hasValidCodes && (
+        <div className="mt-8">
+          <SubscriptionSignupBanner />
+        </div>
+      )}
     </div>
   );
 }

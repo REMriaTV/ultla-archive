@@ -50,6 +50,10 @@ export async function POST(request: Request) {
     const visibility = visibilityStr && ["free", "invite_only", "private"].includes(visibilityStr)
       ? visibilityStr
       : "free";
+    const contentTierStr = formData.get("content_tier") as string | null;
+    const content_tier = contentTierStr && ["basic", "pro", "advance"].includes(contentTierStr)
+      ? contentTierStr
+      : "basic";
 
     if (!file || !title?.trim() || !programId) {
       return NextResponse.json(
@@ -97,6 +101,7 @@ export async function POST(request: Request) {
         year,
         caption,
         visibility,
+        content_tier,
       })
       .select("id")
       .single();

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { AuthHeader } from "@/components/AuthHeader";
 import { HeaderInviteCodeInput } from "@/components/HeaderInviteCodeInput";
+import { HeaderPlanBadge } from "@/components/HeaderPlanBadge";
 import { HeaderSearch } from "@/components/HeaderSearch";
 import { InviteGrantChecker } from "@/components/InviteGrantChecker";
 import { LoggedInSidebarLayout } from "@/components/LoggedInSidebarLayout";
@@ -78,6 +79,7 @@ export default async function RootLayout({
                 <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-4">
                   <HeaderInviteCodeInput />
                   <HeaderSearch />
+                  <HeaderPlanBadge />
                   <AuthHeader />
                 </div>
               </div>

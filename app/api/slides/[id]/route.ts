@@ -147,6 +147,9 @@ export async function PATCH(
     if (typeof body.visibility === "string" && ["free", "invite_only", "private"].includes(body.visibility)) {
       updates.visibility = body.visibility;
     }
+    if (typeof body.content_tier === "string" && ["basic", "pro", "advance"].includes(body.content_tier)) {
+      updates.content_tier = body.content_tier;
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(

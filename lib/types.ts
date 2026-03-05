@@ -4,6 +4,12 @@ export type GenreType = string;
 /** スライドの公開レベル */
 export type SlideVisibility = "free" | "invite_only" | "private";
 
+/** コンテンツ階層（サブスク用）。NULL は basic 扱い */
+export type ContentTier = "basic" | "pro" | "advance";
+
+/** ユーザープラン（profiles.plan） */
+export type Plan = "free" | "basic" | "pro" | "advance" | "premium";
+
 export interface Program {
   id: string;
   slug: string;
@@ -29,6 +35,8 @@ export interface Slide {
   page_image_urls: string[] | null;
   /** free=未ログインでも一覧・4枚まで, invite_only=紐づくコード必須, private=管理者のみ */
   visibility?: SlideVisibility;
+  /** basic=BASICでフル閲覧, pro=PROでレンタル/購入, advance=ADVANCEのみ。NULLはbasic扱い */
+  content_tier?: ContentTier | null;
 }
 
 /** 招待コード（閲覧可能なスライドのセットを定義） */
