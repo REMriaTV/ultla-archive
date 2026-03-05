@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import type React from "react";
 
 type Block =
   | { type: "h2"; text: string }
   | { type: "p"; text: string }
+  | { type: "pWithLink"; before: string; linkText: string; href: string; after: string }
   | { type: "ul"; items: string[] }
   | { type: "blockquote"; text: string }
   | { type: "hr" };
@@ -95,6 +97,20 @@ function parseMarkdown(text: string): Block[] {
     // default: paragraph line
     flushList();
     flushQuote();
+
+    const linkMatch = line.match(/^(.*)\[([^\]]+)\]\(([^)]+)\)(.*)$/);
+    if (linkMatch) {
+      const [, before, linkText, href, after] = linkMatch;
+      blocks.push({
+        type: "pWithLink",
+        before: before ?? "",
+        linkText,
+        href,
+        after: after ?? "",
+      });
+      continue;
+    }
+
     blocks.push({ type: "p", text: line });
   }
 
@@ -123,6 +139,20 @@ export function AnnouncementMarkdown({ body }: { body: string }) {
             return (
               <p key={idx}>
                 {renderInline(block.text)}
+              </p>
+            );
+          case "pWithLink":
+            return (
+              <p key={idx}>
+                {block.before && renderInline(block.before)}
+                <Link
+                  href={block.href}
+                  className="underline underline-offset-2 hover:opacity-90"
+                  style={{ color: "var(--accent)" }}
+                >
+                  {block.linkText}
+                </Link>
+                {block.after && renderInline(block.after)}
               </p>
             );
           case "ul":
