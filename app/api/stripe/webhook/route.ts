@@ -5,6 +5,11 @@ import Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
 
+type StripeSubscriptionWithPeriod = Stripe.Subscription & {
+  current_period_end?: number;
+  current_period_start?: number;
+};
+
 const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY)
   : null;
@@ -45,7 +50,7 @@ export async function POST(request: Request) {
     switch (event.type) {
       case "customer.subscription.created":
       case "customer.subscription.updated": {
-        const sub = event.data.object as Stripe.Subscription;
+        const sub = event.data.object as StripeSubscriptionWithPeriod;
         const userId = sub.metadata?.user_id;
         if (!userId) break;
 
