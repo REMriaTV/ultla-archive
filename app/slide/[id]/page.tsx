@@ -17,7 +17,7 @@ export default async function SlideDetailPage({ params }: SlideDetailPageProps) 
   const supabase = await createClient();
   const accessCtx = await getAccessContext(supabase, supabaseAdmin ?? null);
 
-  const slideClient = accessCtx.isAdmin && supabaseAdmin ? supabaseAdmin : supabase;
+  const slideClient = (accessCtx.isAdmin || accessCtx.isCoreStaff) && supabaseAdmin ? supabaseAdmin : supabase;
   const { data: slide, error } = await slideClient
     .from("slides")
     .select("*")

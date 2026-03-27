@@ -14,6 +14,10 @@ export async function PATCH(
   if (!user) {
     return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
   }
+  const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+  if (profile?.is_admin !== true) {
+    return NextResponse.json({ error: "管理者のみ利用できます" }, { status: 403 });
+  }
 
   const { id } = await params;
   if (!id) {
@@ -58,6 +62,19 @@ export async function PATCH(
     }
   }
 
+  if (Array.isArray(body.video_ids)) {
+    const videoIds = body.video_ids
+      .map((v: unknown) => (typeof v === "number" ? v : typeof v === "string" ? parseInt(v, 10) : NaN))
+      .filter((n: number): n is number => !isNaN(n));
+    await supabaseAdmin.from("invite_code_videos").delete().eq("invite_code_id", id);
+    if (videoIds.length > 0) {
+      const { error } = await supabaseAdmin.from("invite_code_videos").insert(
+        videoIds.map((video_id: number) => ({ invite_code_id: id, video_id }))
+      );
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
+
   return NextResponse.json({ success: true });
 }
 
@@ -70,6 +87,10 @@ export async function DELETE(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
+  }
+  const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+  if (profile?.is_admin !== true) {
+    return NextResponse.json({ error: "管理者のみ利用できます" }, { status: 403 });
   }
 
   const { id } = await params;

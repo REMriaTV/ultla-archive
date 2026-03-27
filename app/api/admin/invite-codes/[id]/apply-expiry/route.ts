@@ -14,6 +14,10 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
   }
+  const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+  if (profile?.is_admin !== true) {
+    return NextResponse.json({ error: "管理者のみ利用できます" }, { status: 403 });
+  }
 
   const { id } = await params;
   if (!id) {

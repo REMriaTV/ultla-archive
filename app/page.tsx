@@ -7,7 +7,7 @@ import { GuestBanner } from "@/components/GuestBanner";
 import { HeroSlides } from "@/components/HeroSlides";
 import { CuratedShelf, InviteSeriesShelf, MylistShelf, ProgramShelf, VideoSeriesShelf, type CuratedShelfItem, type VideoShelfItem } from "@/components/ProgramShelf";
 import { SearchSection } from "@/components/SearchSection";
-import { getAccessContext, filterVisibleSlides } from "@/lib/access";
+import { getAccessContext, filterVisibleSlides, canViewVideo } from "@/lib/access";
 import type { Slide } from "@/lib/types";
 
 function shuffle<T>(arr: T[]): T[] {
@@ -49,10 +49,10 @@ export default async function Home(props: HomeProps) {
       .from("programs")
       .select("*")
       .order("started_year", { ascending: true, nullsFirst: false }),
-    accessCtx.isAdmin && supabaseAdmin
+    (accessCtx.isAdmin || accessCtx.isCoreStaff) && supabaseAdmin
       ? supabaseAdmin.from("slides").select("*")
       : supabase.from("slides").select("*"),
-    accessCtx.isAdmin && supabaseAdmin
+    (accessCtx.isAdmin || accessCtx.isCoreStaff) && supabaseAdmin
       ? supabaseAdmin.from("videos").select("*")
       : supabase.from("videos").select("*"),
     supabase
@@ -132,17 +132,7 @@ export default async function Home(props: HomeProps) {
     is_published?: boolean | null;
   }>;
 
-  const visibleVideos = rawVideos.filter((video) => {
-    if (video.is_published === false) return false;
-    if (accessCtx.isAdmin) return true;
-    const vis = video.visibility ?? "free";
-    if (vis === "private") return false;
-    const tier = video.content_tier ?? "basic";
-    if (accessCtx.plan === "advance" || accessCtx.plan === "premium") return true;
-    if (accessCtx.plan === "pro" && (tier === "basic" || tier === "pro")) return vis !== "invite_only" || (accessCtx.accessibleSlideIds !== null && accessCtx.accessibleSlideIds.size > 0);
-    if (accessCtx.plan === "basic") return tier === "basic" && (vis === "free" || (vis === "invite_only" && accessCtx.accessibleSlideIds !== null && accessCtx.accessibleSlideIds.size > 0));
-    return vis === "free" && tier === "basic";
-  });
+  const visibleVideos = rawVideos.filter((video) => canViewVideo(video, accessCtx));
 
   const videosByProgram = new Map<string, VideoShelfItem[]>();
   const visibleVideosById = new Map<string, (typeof rawVideos)[number]>();

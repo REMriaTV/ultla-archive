@@ -43,7 +43,8 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
 
   const accessCtx = await getAccessContext(supabase, supabaseAdmin ?? null);
 
-  const { data: slidesData, error: slidesError } = await supabase
+  const slidesClient = (accessCtx.isAdmin || accessCtx.isCoreStaff) && supabaseAdmin ? supabaseAdmin : supabase;
+  const { data: slidesData, error: slidesError } = await slidesClient
     .from("slides")
     .select("*")
     .eq("program_id", program.id)

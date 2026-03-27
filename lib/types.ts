@@ -49,7 +49,7 @@ export interface Slide {
   content_tier?: ContentTier | null;
 }
 
-/** 招待コード（閲覧可能なスライドのセットを定義） */
+/** 招待コード（閲覧可能なスライド/動画のセットを定義） */
 export interface InviteCode {
   id: string;
   code: string;
@@ -64,6 +64,12 @@ export interface InviteCode {
 export interface InviteCodeSlide {
   invite_code_id: string;
   slide_id: string;
+}
+
+/** 招待コード×動画紐づけ */
+export interface InviteCodeVideo {
+  invite_code_id: string;
+  video_id: string;
 }
 
 /** ユーザー×招待コード紐づけ（有効期限付き） */

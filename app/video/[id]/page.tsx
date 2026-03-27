@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getAccessContext } from "@/lib/access";
+import { canViewVideo, getAccessContext } from "@/lib/access";
 import { VideoEpisodeRail } from "@/components/VideoEpisodeRail";
 
 interface VideoDetailPageProps {
@@ -24,23 +24,6 @@ type VideoRow = {
   sort_order?: number | null;
   created_at?: string | null;
 };
-
-function canViewVideo(video: VideoRow, ctx: Awaited<ReturnType<typeof getAccessContext>>): boolean {
-  if (video.is_published === false && !ctx.isAdmin) return false;
-  if (ctx.isAdmin) return true;
-  const vis = video.visibility ?? "free";
-  if (vis === "private") return false;
-  const tier = video.content_tier ?? "basic";
-  if (ctx.plan === "advance" || ctx.plan === "premium") return true;
-  if (ctx.plan === "pro") {
-    return (tier === "basic" || tier === "pro") &&
-      (vis !== "invite_only" || (ctx.accessibleSlideIds !== null && ctx.accessibleSlideIds.size > 0));
-  }
-  if (ctx.plan === "basic") {
-    return tier === "basic" && (vis === "free" || (vis === "invite_only" && ctx.accessibleSlideIds !== null && ctx.accessibleSlideIds.size > 0));
-  }
-  return vis === "free" && tier === "basic";
-}
 
 function extractYoutubeId(url: string, fallback?: string | null): string | null {
   try {
@@ -72,7 +55,7 @@ export default async function VideoDetailPage({ params }: VideoDetailPageProps) 
   const supabase = await createClient();
   const accessCtx = await getAccessContext(supabase, supabaseAdmin ?? null);
 
-  const videoClient = accessCtx.isAdmin && supabaseAdmin ? supabaseAdmin : supabase;
+  const videoClient = (accessCtx.isAdmin || accessCtx.isCoreStaff) && supabaseAdmin ? supabaseAdmin : supabase;
   const { data: video, error } = await videoClient
     .from("videos")
     .select("*")
@@ -89,7 +72,7 @@ export default async function VideoDetailPage({ params }: VideoDetailPageProps) 
     .eq("id", current.program_id)
     .maybeSingle();
 
-  const listClient = accessCtx.isAdmin && supabaseAdmin ? supabaseAdmin : supabase;
+  const listClient = (accessCtx.isAdmin || accessCtx.isCoreStaff) && supabaseAdmin ? supabaseAdmin : supabase;
   const { data: sameProgramRows } = await listClient
     .from("videos")
     .select("*")
@@ -104,6 +87,11 @@ export default async function VideoDetailPage({ params }: VideoDetailPageProps) 
 
   const youtubeId = extractYoutubeId(current.youtube_url, current.youtube_video_id);
   if (!youtubeId) notFound();
+  const embedParams = new URLSearchParams({
+    rel: "0",
+    modestbranding: "1",
+    playsinline: "1",
+  });
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)" }}>
@@ -131,7 +119,7 @@ export default async function VideoDetailPage({ params }: VideoDetailPageProps) 
         <section className="mb-6 overflow-hidden rounded-lg border" style={{ borderColor: "var(--border)", background: "var(--card-hover)" }}>
           <div className="aspect-video w-full">
             <iframe
-              src={`https://www.youtube.com/embed/${youtubeId}`}
+              src={`https://www.youtube-nocookie.com/embed/${youtubeId}?${embedParams.toString()}`}
               title={current.title}
               className="h-full w-full border-0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

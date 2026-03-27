@@ -14,6 +14,8 @@ export default async function MypageAccountPage() {
   const accessLabel =
     accessCtx.isAdmin
       ? "管理者（全スライド・ダウンロード可）"
+      : accessCtx.isCoreStaff
+        ? "コアスタッフ（全コンテンツ視聴可）"
       : accessCtx.plan === "premium" || accessCtx.plan === "advance"
         ? "全スライド閲覧・ダウンロード可"
         : accessCtx.plan === "pro" || accessCtx.plan === "basic"

@@ -11,6 +11,10 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
   }
+  const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+  if (profile?.is_admin !== true) {
+    return NextResponse.json({ error: "管理者のみ利用できます" }, { status: 403 });
+  }
 
   if (!supabaseAdmin) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
@@ -25,20 +29,32 @@ export async function GET() {
     return NextResponse.json({ error: codesError.message }, { status: 500 });
   }
 
-  const { data: links } = await supabaseAdmin
-    .from("invite_code_slides")
-    .select("invite_code_id, slide_id");
+  const [{ data: slideLinks }, { data: videoLinks }] = await Promise.all([
+    supabaseAdmin
+      .from("invite_code_slides")
+      .select("invite_code_id, slide_id"),
+    supabaseAdmin
+      .from("invite_code_videos")
+      .select("invite_code_id, video_id"),
+  ]);
 
   const slideIdsByCode = new Map<string, string[]>();
-  for (const link of links ?? []) {
+  for (const link of slideLinks ?? []) {
     const arr = slideIdsByCode.get(link.invite_code_id) ?? [];
     arr.push(link.slide_id);
     slideIdsByCode.set(link.invite_code_id, arr);
+  }
+  const videoIdsByCode = new Map<string, string[]>();
+  for (const link of videoLinks ?? []) {
+    const arr = videoIdsByCode.get(link.invite_code_id) ?? [];
+    arr.push(link.video_id);
+    videoIdsByCode.set(link.invite_code_id, arr);
   }
 
   const result = (codes ?? []).map((c) => ({
     ...c,
     slide_ids: slideIdsByCode.get(c.id) ?? [],
+    video_ids: videoIdsByCode.get(c.id) ?? [],
   }));
 
   return NextResponse.json(result);
@@ -50,6 +66,10 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
+  }
+  const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+  if (profile?.is_admin !== true) {
+    return NextResponse.json({ error: "管理者のみ利用できます" }, { status: 403 });
   }
 
   if (!supabaseAdmin) {
@@ -66,6 +86,11 @@ export async function POST(request: Request) {
   const slideIds = Array.isArray(body.slide_ids)
     ? body.slide_ids
         .map((s: unknown) => (typeof s === "number" ? s : typeof s === "string" ? parseInt(s, 10) : NaN))
+        .filter((n: number): n is number => !isNaN(n))
+    : [];
+  const videoIds = Array.isArray(body.video_ids)
+    ? body.video_ids
+        .map((v: unknown) => (typeof v === "number" ? v : typeof v === "string" ? parseInt(v, 10) : NaN))
         .filter((n: number): n is number => !isNaN(n))
     : [];
 
@@ -93,11 +118,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  if (slideIds.length > 0 && created?.id) {
-    const { error } = await supabaseAdmin.from("invite_code_slides").insert(
-      slideIds.map((slide_id: number) => ({ invite_code_id: created.id, slide_id }))
-    );
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (created?.id) {
+    if (slideIds.length > 0) {
+      const { error } = await supabaseAdmin.from("invite_code_slides").insert(
+        slideIds.map((slide_id: number) => ({ invite_code_id: created.id, slide_id }))
+      );
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    if (videoIds.length > 0) {
+      const { error } = await supabaseAdmin.from("invite_code_videos").insert(
+        videoIds.map((video_id: number) => ({ invite_code_id: created.id, video_id }))
+      );
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ success: true, id: created?.id });

@@ -137,14 +137,25 @@ export default function AdminPage() {
     used_count: number;
     default_expires_at: string | null;
     slide_ids: string[];
+    video_ids: string[];
   }>>([]);
   const [loadingInviteCodes, setLoadingInviteCodes] = useState(false);
   const [creatingInviteCode, setCreatingInviteCode] = useState(false);
-  const [inviteCodeForm, setInviteCodeForm] = useState({ code: "", name: "", description: "", default_expires_at: "", slide_ids: [] as string[] });
+  const [inviteCodeForm, setInviteCodeForm] = useState({ code: "", name: "", description: "", default_expires_at: "", slide_ids: [] as string[], video_ids: [] as string[] });
   const [editingInviteCode, setEditingInviteCode] = useState<typeof inviteCodes[0] | null>(null);
-  const [inviteCodeEditForm, setInviteCodeEditForm] = useState({ name: "", description: "", default_expires_at: "", slide_ids: [] as string[] });
+  const [inviteCodeEditForm, setInviteCodeEditForm] = useState({ name: "", description: "", default_expires_at: "", slide_ids: [] as string[], video_ids: [] as string[] });
   const [savingInviteCode, setSavingInviteCode] = useState(false);
   const [applyingExpiryId, setApplyingExpiryId] = useState<string | null>(null);
+  const [grantRoleEmail, setGrantRoleEmail] = useState("");
+  const [grantRoleLoading, setGrantRoleLoading] = useState(false);
+  const [grantRoleMessage, setGrantRoleMessage] = useState<string | null>(null);
+  const [roleMembers, setRoleMembers] = useState<Array<{
+    user_id: string;
+    email: string;
+    is_admin: boolean;
+    is_core_staff: boolean;
+  }>>([]);
+  const [loadingRoleMembers, setLoadingRoleMembers] = useState(false);
 
   const [siteSettingsSubtitle, setSiteSettingsSubtitle] = useState("");
   const [siteSettingsFooterText, setSiteSettingsFooterText] = useState("");
@@ -302,6 +313,7 @@ export default function AdminPage() {
     loadVideos();
     loadShelves();
     loadFrontShelfOrder();
+    loadRoleMembers();
   }, []);
 
   async function loadSiteSettings() {
@@ -1139,12 +1151,13 @@ export default function AdminPage() {
           description: inviteCodeForm.description.trim() || null,
           default_expires_at: defaultExpiresAt,
           slide_ids: inviteCodeForm.slide_ids,
+          video_ids: inviteCodeForm.video_ids,
         }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "作成失敗");
       setCreatingInviteCode(false);
-      setInviteCodeForm({ code: "", name: "", description: "", default_expires_at: "", slide_ids: [] });
+      setInviteCodeForm({ code: "", name: "", description: "", default_expires_at: "", slide_ids: [], video_ids: [] });
       loadInviteCodes();
     } catch (err) {
       alert(err instanceof Error ? err.message : "招待コードの作成に失敗しました");
@@ -1169,6 +1182,7 @@ export default function AdminPage() {
           description: inviteCodeEditForm.description.trim() || null,
           default_expires_at: defaultExpiresAt,
           slide_ids: inviteCodeEditForm.slide_ids,
+          video_ids: inviteCodeEditForm.video_ids,
         }),
       });
       const json = await res.json();
@@ -1183,7 +1197,7 @@ export default function AdminPage() {
   }
 
   async function handleDeleteInviteCode(id: string) {
-    if (!confirm("この招待コードを削除しますか？紐づくスライドの設定も消えます。")) return;
+    if (!confirm("この招待コードを削除しますか？紐づくスライド・動画の設定も消えます。")) return;
     try {
       const res = await fetch(`/api/admin/invite-codes/${id}`, { method: "DELETE" });
       const json = await res.json();
@@ -1207,6 +1221,73 @@ export default function AdminPage() {
       alert(err instanceof Error ? err.message : "一括適用に失敗しました");
     } finally {
       setApplyingExpiryId(null);
+    }
+  }
+
+  async function handleGrantRole(role: "admin" | "core_staff") {
+    const email = grantRoleEmail.trim();
+    if (!email) {
+      setGrantRoleMessage("メールアドレスを入力してください");
+      return;
+    }
+    setGrantRoleLoading(true);
+    setGrantRoleMessage(null);
+    try {
+      const res = await fetch("/api/admin/users/grant-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, role, action: "grant" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "権限付与に失敗しました");
+      setGrantRoleMessage(json.message || "権限を付与しました");
+      setGrantRoleEmail("");
+      await loadRoleMembers();
+    } catch (err) {
+      setGrantRoleMessage(err instanceof Error ? err.message : "権限付与に失敗しました");
+    } finally {
+      setGrantRoleLoading(false);
+    }
+  }
+
+  async function handleRevokeRole(role: "admin" | "core_staff") {
+    const email = grantRoleEmail.trim();
+    if (!email) {
+      setGrantRoleMessage("メールアドレスを入力してください");
+      return;
+    }
+    setGrantRoleLoading(true);
+    setGrantRoleMessage(null);
+    try {
+      const res = await fetch("/api/admin/users/grant-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, role, action: "revoke" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "権限解除に失敗しました");
+      setGrantRoleMessage(json.message || "権限を解除しました");
+      setGrantRoleEmail("");
+      await loadRoleMembers();
+    } catch (err) {
+      setGrantRoleMessage(err instanceof Error ? err.message : "権限解除に失敗しました");
+    } finally {
+      setGrantRoleLoading(false);
+    }
+  }
+
+  async function loadRoleMembers() {
+    setLoadingRoleMembers(true);
+    try {
+      const res = await fetch("/api/admin/users/grant-role");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "権限メンバーの取得に失敗しました");
+      setRoleMembers(Array.isArray(data.items) ? data.items : []);
+    } catch (err) {
+      console.error(err);
+      setRoleMembers([]);
+    } finally {
+      setLoadingRoleMembers(false);
     }
   }
 
@@ -2709,6 +2790,92 @@ export default function AdminPage() {
           )}
         </section>
 
+        {/* メンバー権限付与（最短運用） */}
+        <section className={`mb-12 rounded-lg border border-neutral-200 bg-white p-6 ${adminView === "operations" ? "" : "hidden"}`}>
+          <h2 className="text-lg font-semibold text-neutral-800">メンバー権限付与</h2>
+          <p className="mt-2 text-sm text-neutral-600">
+            メールアドレスを入力して、管理者またはコアスタッフ権限を付与/解除します（対象ユーザーは事前にログイン済みである必要があります）。
+          </p>
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <div className="min-w-0 flex-1">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">メールアドレス</label>
+              <input
+                type="email"
+                value={grantRoleEmail}
+                onChange={(e) => setGrantRoleEmail(e.target.value)}
+                placeholder="example@domain.com"
+                className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => handleGrantRole("admin")}
+              disabled={grantRoleLoading}
+              className="rounded border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+            >
+              管理者を付与
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRevokeRole("admin")}
+              disabled={grantRoleLoading}
+              className="rounded border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              管理者を解除
+            </button>
+            <button
+              type="button"
+              onClick={() => handleGrantRole("core_staff")}
+              disabled={grantRoleLoading}
+              className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+            >
+              コアスタッフを付与
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRevokeRole("core_staff")}
+              disabled={grantRoleLoading}
+              className="rounded border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              コアスタッフを解除
+            </button>
+          </div>
+          {grantRoleMessage && (
+            <p className="mt-3 text-sm text-neutral-700">{grantRoleMessage}</p>
+          )}
+          <div className="mt-5 rounded-lg border border-neutral-200">
+            <div className="border-b border-neutral-200 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-600">
+              現在の権限メンバー
+            </div>
+            {loadingRoleMembers ? (
+              <p className="px-3 py-3 text-sm text-neutral-500">読み込み中...</p>
+            ) : roleMembers.length === 0 ? (
+              <p className="px-3 py-3 text-sm text-neutral-500">管理者/コアスタッフはまだ登録されていません</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-neutral-200 bg-white">
+                    <tr>
+                      <th className="px-3 py-2 font-medium text-neutral-700">メール</th>
+                      <th className="px-3 py-2 font-medium text-neutral-700">管理者</th>
+                      <th className="px-3 py-2 font-medium text-neutral-700">コアスタッフ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roleMembers.map((m) => (
+                      <tr key={m.user_id} className="border-b border-neutral-100 last:border-0">
+                        <td className="px-3 py-2 text-neutral-800">{m.email}</td>
+                        <td className="px-3 py-2 text-neutral-600">{m.is_admin ? "✅" : "—"}</td>
+                        <td className="px-3 py-2 text-neutral-600">{m.is_core_staff ? "✅" : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
+
         {/* 招待コード管理 */}
         <section className={`mb-12 rounded-lg border border-neutral-200 bg-white p-6 ${adminView === "operations" ? "" : "hidden"}`}>
           <div className="mb-4 flex items-center justify-between">
@@ -2717,7 +2884,7 @@ export default function AdminPage() {
               type="button"
               onClick={() => {
                 setCreatingInviteCode(true);
-                setInviteCodeForm({ code: "", name: "", description: "", default_expires_at: "", slide_ids: [] });
+                setInviteCodeForm({ code: "", name: "", description: "", default_expires_at: "", slide_ids: [], video_ids: [] });
               }}
               className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
             >
@@ -2725,7 +2892,7 @@ export default function AdminPage() {
             </button>
           </div>
           <p className="mb-4 text-sm text-neutral-600">
-            招待コードごとに閲覧可能なスライドを紐づけます。ユーザーがコードを入力すると、紐づけたスライドのみ閲覧できます。
+            招待コードごとに閲覧可能なスライド・動画を紐づけます。ユーザーがコードを入力すると、紐づけたコンテンツのみ閲覧できます。
           </p>
           {loadingInviteCodes ? (
             <p className="text-sm text-neutral-500">読み込み中...</p>
@@ -2738,6 +2905,7 @@ export default function AdminPage() {
                     <th className="px-4 py-3 font-medium text-neutral-700">名前</th>
                     <th className="px-4 py-3 font-medium text-neutral-700">有効期限（既定）</th>
                     <th className="px-4 py-3 font-medium text-neutral-700">紐づけスライド数</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">紐づけ動画数</th>
                     <th className="px-4 py-3 font-medium text-neutral-700">使用数</th>
                     <th className="w-28 px-4 py-3 font-medium text-neutral-700">操作</th>
                   </tr>
@@ -2756,6 +2924,7 @@ export default function AdminPage() {
                           : "—"}
                       </td>
                       <td className="px-4 py-3 text-neutral-600">{ic.slide_ids?.length ?? 0}件</td>
+                      <td className="px-4 py-3 text-neutral-600">{ic.video_ids?.length ?? 0}件</td>
                       <td className="px-4 py-3 text-neutral-600">{ic.used_count} / {ic.max_uses}</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
@@ -2768,6 +2937,7 @@ export default function AdminPage() {
                                 description: ic.description ?? "",
                                 default_expires_at: ic.default_expires_at ? ic.default_expires_at.slice(0, 10) : "",
                                 slide_ids: ic.slide_ids ?? [],
+                                video_ids: ic.video_ids ?? [],
                               });
                             }}
                             className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
@@ -2840,7 +3010,7 @@ export default function AdminPage() {
                 <label className="mb-1 block text-xs font-medium text-neutral-600">紐づけるスライド（チェックで選択）</label>
                 <div className="max-h-48 overflow-y-auto rounded border border-neutral-200 bg-white p-2">
                   {slides.map((s) => (
-                    <label key={s.id} className="mb-1 flex cursor-pointer gap-2 text-sm">
+                    <label key={s.id} className="mb-1 flex cursor-pointer gap-2 text-sm text-neutral-800">
                       <input
                         type="checkbox"
                         checked={inviteCodeForm.slide_ids.some((id) => String(id) === String(s.id))}
@@ -2856,6 +3026,28 @@ export default function AdminPage() {
                     </label>
                   ))}
                   {slides.length === 0 && <p className="text-xs text-neutral-500">スライドがありません</p>}
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">紐づける動画（チェックで選択）</label>
+                <div className="max-h-48 overflow-y-auto rounded border border-neutral-200 bg-white p-2">
+                  {videos.map((v) => (
+                    <label key={v.id} className="mb-1 flex cursor-pointer gap-2 text-sm text-neutral-800">
+                      <input
+                        type="checkbox"
+                        checked={inviteCodeForm.video_ids.some((id) => String(id) === String(v.id))}
+                        onChange={(e) => {
+                          const vid = String(v.id);
+                          const ids = e.target.checked
+                            ? [...inviteCodeForm.video_ids, vid]
+                            : inviteCodeForm.video_ids.filter((id) => String(id) !== vid);
+                          setInviteCodeForm((f) => ({ ...f, video_ids: ids }));
+                        }}
+                      />
+                      <span className="truncate">{v.title}</span>
+                    </label>
+                  ))}
+                  {videos.length === 0 && <p className="text-xs text-neutral-500">動画がありません</p>}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -2915,7 +3107,7 @@ export default function AdminPage() {
                     <label className="mb-1 block text-xs font-medium text-neutral-600">紐づけるスライド（チェックで選択）</label>
                     <div className="max-h-48 overflow-y-auto rounded border border-neutral-200 bg-white p-2">
                       {slides.map((s) => (
-                        <label key={s.id} className="mb-1 flex cursor-pointer gap-2 text-sm">
+                        <label key={s.id} className="mb-1 flex cursor-pointer gap-2 text-sm text-neutral-800">
                           <input
                             type="checkbox"
                             checked={inviteCodeEditForm.slide_ids.some((id) => String(id) === String(s.id))}
@@ -2930,6 +3122,28 @@ export default function AdminPage() {
                           <span className="truncate">{s.title}</span>
                         </label>
                       ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">紐づける動画（チェックで選択）</label>
+                    <div className="max-h-48 overflow-y-auto rounded border border-neutral-200 bg-white p-2">
+                      {videos.map((v) => (
+                        <label key={v.id} className="mb-1 flex cursor-pointer gap-2 text-sm text-neutral-800">
+                          <input
+                            type="checkbox"
+                            checked={inviteCodeEditForm.video_ids.some((id) => String(id) === String(v.id))}
+                            onChange={(e) => {
+                              const vid = String(v.id);
+                              const ids = e.target.checked
+                                ? [...inviteCodeEditForm.video_ids, vid]
+                                : inviteCodeEditForm.video_ids.filter((id) => String(id) !== vid);
+                              setInviteCodeEditForm((f) => ({ ...f, video_ids: ids }));
+                            }}
+                          />
+                          <span className="truncate">{v.title}</span>
+                        </label>
+                      ))}
+                      {videos.length === 0 && <p className="text-xs text-neutral-500">動画がありません</p>}
                     </div>
                   </div>
                   {editingInviteCode.default_expires_at && (
