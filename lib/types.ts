@@ -16,6 +16,16 @@ export interface Program {
   name: string;
   description: string | null;
   started_year: number | null;
+  /** 旧: 共通バッジ表示名（互換用） */
+  shelf_badge_label?: string | null;
+  /** スライド棚のバッジ表示設定（未設定なら非表示） */
+  slide_badge_label?: string | null;
+  slide_badge_bg?: string | null;
+  slide_badge_text?: string | null;
+  /** 動画棚のバッジ表示設定（未設定なら非表示） */
+  video_badge_label?: string | null;
+  video_badge_bg?: string | null;
+  video_badge_text?: string | null;
   /** ジャンル種別（genre_types.id を参照） */
   genre_type?: string | null;
   /** フロントのシリーズ棚に表示するか。false だと棚に出さない */

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { KeywordTagInput } from "@/components/KeywordTagInput";
 import { AnnouncementMarkdown } from "@/components/AnnouncementMarkdown";
@@ -54,11 +55,19 @@ interface Program {
   slug: string;
   description: string | null;
   started_year: number | null;
+  shelf_badge_label?: string | null;
+  slide_badge_label?: string | null;
+  slide_badge_bg?: string | null;
+  slide_badge_text?: string | null;
+  video_badge_label?: string | null;
+  video_badge_bg?: string | null;
+  video_badge_text?: string | null;
   genre_type: string | null;
   show_on_front?: boolean;
 }
 
 export default function AdminPage() {
+  const pathname = usePathname();
   const [slides, setSlides] = useState<SlideRow[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +96,14 @@ export default function AdminPage() {
     content_tier: "basic" as ContentTier,
   });
   const [keywordTags, setKeywordTags] = useState<string[]>([]);
+  const [slideBadgeSelect, setSlideBadgeSelect] = useState("");
+  const [slideBadgeNewLabel, setSlideBadgeNewLabel] = useState("");
+  const [slideBadgeBg, setSlideBadgeBg] = useState("#f59e0b");
+  const [slideBadgeText, setSlideBadgeText] = useState("#ffffff");
+  const [slideEditBadgeSelect, setSlideEditBadgeSelect] = useState("");
+  const [slideEditBadgeNewLabel, setSlideEditBadgeNewLabel] = useState("");
+  const [slideEditBadgeBg, setSlideEditBadgeBg] = useState("#f59e0b");
+  const [slideEditBadgeText, setSlideEditBadgeText] = useState("#ffffff");
   const [editingProgram, setEditingProgram] = useState<Program | null>(null);
   const [creatingProgram, setCreatingProgram] = useState(false);
   const [programForm, setProgramForm] = useState({
@@ -95,6 +112,12 @@ export default function AdminPage() {
     genre_type: "program",
     description: "",
     started_year: "",
+    slide_badge_label: "",
+    slide_badge_bg: "#f59e0b",
+    slide_badge_text: "#ffffff",
+    video_badge_label: "",
+    video_badge_bg: "#f59e0b",
+    video_badge_text: "#ffffff",
     show_on_front: true,
   });
   const [savingProgram, setSavingProgram] = useState(false);
@@ -162,6 +185,111 @@ export default function AdminPage() {
   const [savingAnnouncement, setSavingAnnouncement] = useState(false);
   const [announcementBodyTab, setAnnouncementBodyTab] = useState<"edit" | "preview">("edit");
   const [announcementEditBodyTab, setAnnouncementEditBodyTab] = useState<"edit" | "preview">("edit");
+  const [videos, setVideos] = useState<Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    keyword_tags: string[];
+    youtube_url: string;
+    youtube_video_id: string | null;
+    program_id: number;
+    visibility: SlideVisibility;
+    content_tier: ContentTier;
+    is_published: boolean;
+    slide_ids: number[];
+    created_at: string;
+  }>>([]);
+  const [loadingVideos, setLoadingVideos] = useState(false);
+  const [creatingVideo, setCreatingVideo] = useState(false);
+  const [savingVideo, setSavingVideo] = useState(false);
+  const [videoForm, setVideoForm] = useState({
+    title: "",
+    description: "",
+    youtube_url: "",
+    program_id: "",
+    visibility: "free" as SlideVisibility,
+    content_tier: "basic" as ContentTier,
+    is_published: true,
+  });
+  const [videoKeywordTags, setVideoKeywordTags] = useState<string[]>([]);
+  const [videoBadgeSelect, setVideoBadgeSelect] = useState("");
+  const [videoBadgeNewLabel, setVideoBadgeNewLabel] = useState("");
+  const [videoBadgeBg, setVideoBadgeBg] = useState("#f59e0b");
+  const [videoBadgeText, setVideoBadgeText] = useState("#ffffff");
+  const [editingVideo, setEditingVideo] = useState<(typeof videos)[0] | null>(null);
+  const [videoEditForm, setVideoEditForm] = useState({
+    title: "",
+    description: "",
+    youtube_url: "",
+    program_id: "",
+    visibility: "free" as SlideVisibility,
+    content_tier: "basic" as ContentTier,
+    is_published: true,
+  });
+  const [videoEditKeywordTags, setVideoEditKeywordTags] = useState<string[]>([]);
+  const [videoEditSlideIds, setVideoEditSlideIds] = useState<number[]>([]);
+  const [videoEditBadgeSelect, setVideoEditBadgeSelect] = useState("");
+  const [videoEditBadgeNewLabel, setVideoEditBadgeNewLabel] = useState("");
+  const [videoEditBadgeBg, setVideoEditBadgeBg] = useState("#f59e0b");
+  const [videoEditBadgeText, setVideoEditBadgeText] = useState("#ffffff");
+  const [videoSlideIds, setVideoSlideIds] = useState<number[]>([]);
+  const [creatingQuickProgram, setCreatingQuickProgram] = useState(false);
+  const [savingQuickProgram, setSavingQuickProgram] = useState(false);
+  const [quickProgramName, setQuickProgramName] = useState("");
+  const [quickProgramSlug, setQuickProgramSlug] = useState("");
+  const [selectedPdfName, setSelectedPdfName] = useState("");
+  const [isPdfDragOver, setIsPdfDragOver] = useState(false);
+  const [shelves, setShelves] = useState<Array<{
+    id: string;
+    title: string;
+    slug: string;
+    description: string | null;
+    sort_order: number;
+    is_published: boolean;
+    items: Array<{
+      id: string;
+      shelf_id: string;
+      content_type: "slide" | "video";
+      content_id: string;
+      sort_order: number;
+    }>;
+  }>>([]);
+  const [loadingShelves, setLoadingShelves] = useState(false);
+  const [creatingShelf, setCreatingShelf] = useState(false);
+  const [savingShelf, setSavingShelf] = useState(false);
+  const [editingShelf, setEditingShelf] = useState<(typeof shelves)[0] | null>(null);
+  const [shelfForm, setShelfForm] = useState({
+    title: "",
+    slug: "",
+    description: "",
+    sort_order: 0,
+    is_published: true,
+  });
+  const [shelfSlideIds, setShelfSlideIds] = useState<string[]>([]);
+  const [shelfVideoIds, setShelfVideoIds] = useState<string[]>([]);
+  const [frontShelfOrder, setFrontShelfOrder] = useState<Array<{
+    id: string;
+    shelf_type: "program_shelf" | "video_program_shelf" | "curated_shelf";
+    ref_id: string;
+    sort_order: number;
+    is_enabled: boolean;
+    label: string;
+  }>>([]);
+  const [loadingFrontShelfOrder, setLoadingFrontShelfOrder] = useState(false);
+  const [savingFrontShelfOrder, setSavingFrontShelfOrder] = useState(false);
+  const [draggingFrontShelfId, setDraggingFrontShelfId] = useState<string | null>(null);
+  const [dragOverFrontShelfId, setDragOverFrontShelfId] = useState<string | null>(null);
+
+  const adminView: "operations" | "slides" | "videos" | "settings" | "master" =
+    pathname === "/admin/slides"
+      ? "slides"
+      : pathname === "/admin/videos"
+        ? "videos"
+        : pathname === "/admin/settings"
+          ? "settings"
+          : pathname === "/admin/master"
+            ? "master"
+            : "operations";
 
   useEffect(() => {
     loadSlides();
@@ -171,6 +299,9 @@ export default function AdminPage() {
     loadSiteSettings();
     loadInquiries();
     loadAnnouncements();
+    loadVideos();
+    loadShelves();
+    loadFrontShelfOrder();
   }, []);
 
   async function loadSiteSettings() {
@@ -186,6 +317,39 @@ export default function AdminPage() {
     } catch {
       console.error("サイト設定読み込み失敗");
     }
+  }
+
+  function getCreatePdfInput(): HTMLInputElement | null {
+    const form = document.getElementById("create-slide-form") as HTMLFormElement | null;
+    return (form?.pdf as HTMLInputElement | undefined) ?? null;
+  }
+
+  function applyPdfFileToCreateForm(file: File) {
+    if (file.type !== "application/pdf") {
+      alert("PDFファイルのみ選択できます");
+      return;
+    }
+    const input = getCreatePdfInput();
+    if (!input) return;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    setSelectedPdfName(file.name);
+  }
+
+  function handlePdfDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setIsPdfDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    applyPdfFileToCreateForm(file);
+  }
+
+  function handlePdfPaste(e: React.ClipboardEvent<HTMLDivElement>) {
+    const file = e.clipboardData.files?.[0];
+    if (!file) return;
+    e.preventDefault();
+    applyPdfFileToCreateForm(file);
   }
 
   async function handleSaveSiteSettings(e: React.FormEvent) {
@@ -239,6 +403,370 @@ export default function AdminPage() {
       console.error("お知らせ一覧読み込み失敗");
     } finally {
       setLoadingAnnouncements(false);
+    }
+  }
+
+  async function loadVideos() {
+    setLoadingVideos(true);
+    try {
+      const res = await fetch("/api/admin/videos");
+      const data = await res.json();
+      if (res.ok && Array.isArray(data)) {
+        setVideos(data);
+      }
+    } catch {
+      console.error("動画一覧読み込み失敗");
+    } finally {
+      setLoadingVideos(false);
+    }
+  }
+
+  async function loadShelves() {
+    setLoadingShelves(true);
+    try {
+      const res = await fetch("/api/admin/shelves");
+      const data = await res.json();
+      if (res.ok && Array.isArray(data)) {
+        setShelves(data);
+      }
+    } catch {
+      console.error("棚一覧読み込み失敗");
+    } finally {
+      setLoadingShelves(false);
+    }
+  }
+
+  async function loadFrontShelfOrder() {
+    setLoadingFrontShelfOrder(true);
+    try {
+      const res = await fetch("/api/admin/front-shelf-order");
+      const data = await res.json();
+      if (res.ok && Array.isArray(data)) {
+        setFrontShelfOrder(data);
+      }
+    } catch {
+      console.error("フロント棚順序の読み込み失敗");
+    } finally {
+      setLoadingFrontShelfOrder(false);
+    }
+  }
+
+  function reorderFrontShelfRows(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+    setFrontShelfOrder((prev) => {
+      const from = prev.findIndex((r) => r.id === draggedId);
+      const to = prev.findIndex((r) => r.id === targetId);
+      if (from < 0 || to < 0) return prev;
+      const list = [...prev];
+      const [moved] = list.splice(from, 1);
+      list.splice(to, 0, moved);
+      return list.map((row, i) => ({ ...row, sort_order: i }));
+    });
+  }
+
+  async function saveFrontShelfOrder() {
+    setSavingFrontShelfOrder(true);
+    try {
+      const payload = frontShelfOrder.map((row, idx) => ({
+        id: row.id,
+        sort_order: idx,
+        is_enabled: row.is_enabled,
+      }));
+      const res = await fetch("/api/admin/front-shelf-order", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: payload }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(`保存失敗: ${json.error ?? "エラー"}`);
+        return;
+      }
+      alert("トップ棚の順序を保存しました");
+      loadFrontShelfOrder();
+    } catch (err) {
+      alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSavingFrontShelfOrder(false);
+    }
+  }
+
+  async function handleCreateShelf(e: React.FormEvent) {
+    e.preventDefault();
+    if (!shelfForm.title.trim()) {
+      alert("棚タイトルを入力してください");
+      return;
+    }
+    setSavingShelf(true);
+    try {
+      const items = [
+        ...shelfSlideIds.map((id, index) => ({ content_type: "slide" as const, content_id: id, sort_order: index })),
+        ...shelfVideoIds.map((id, index) => ({ content_type: "video" as const, content_id: id, sort_order: shelfSlideIds.length + index })),
+      ];
+      const res = await fetch("/api/admin/shelves", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...shelfForm,
+          items,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(`棚作成失敗: ${json.error ?? "エラー"}`);
+        return;
+      }
+      setCreatingShelf(false);
+      setShelfForm({ title: "", slug: "", description: "", sort_order: 0, is_published: true });
+      setShelfSlideIds([]);
+      setShelfVideoIds([]);
+      loadShelves();
+      loadFrontShelfOrder();
+    } catch (err) {
+      alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSavingShelf(false);
+    }
+  }
+
+  async function handleUpdateShelf(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingShelf) return;
+    if (!shelfForm.title.trim()) {
+      alert("棚タイトルを入力してください");
+      return;
+    }
+    setSavingShelf(true);
+    try {
+      const items = [
+        ...shelfSlideIds.map((id, index) => ({ content_type: "slide" as const, content_id: id, sort_order: index })),
+        ...shelfVideoIds.map((id, index) => ({ content_type: "video" as const, content_id: id, sort_order: shelfSlideIds.length + index })),
+      ];
+      const res = await fetch(`/api/admin/shelves/${encodeURIComponent(editingShelf.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...shelfForm,
+          items,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(`棚更新失敗: ${json.error ?? "エラー"}`);
+        return;
+      }
+      setEditingShelf(null);
+      setShelfForm({ title: "", slug: "", description: "", sort_order: 0, is_published: true });
+      setShelfSlideIds([]);
+      setShelfVideoIds([]);
+      loadShelves();
+      loadFrontShelfOrder();
+    } catch (err) {
+      alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSavingShelf(false);
+    }
+  }
+
+  async function handleDeleteShelf(shelfId: string) {
+    if (!confirm("この棚を削除しますか？")) return;
+    try {
+      const res = await fetch(`/api/admin/shelves/${encodeURIComponent(shelfId)}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(`削除失敗: ${json.error ?? "エラー"}`);
+        return;
+      }
+      loadShelves();
+      loadFrontShelfOrder();
+    } catch (err) {
+      alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  async function handleCreateVideo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!videoForm.title.trim() || !videoForm.youtube_url.trim() || !videoForm.program_id) {
+      alert("タイトル・動画URL・シリーズは必須です");
+      return;
+    }
+    setSavingVideo(true);
+    try {
+      const res = await fetch("/api/admin/videos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: videoForm.title.trim(),
+          description: videoForm.description.trim() || null,
+          keyword_tags: videoKeywordTags,
+          youtube_url: videoForm.youtube_url.trim(),
+          program_id: Number(videoForm.program_id),
+          visibility: videoForm.visibility,
+          content_tier: videoForm.content_tier,
+          is_published: videoForm.is_published,
+          slide_ids: videoSlideIds,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(`動画作成失敗: ${json.error ?? "エラー"}`);
+        return;
+      }
+      const selectedVideoBadgeLabel =
+        videoBadgeSelect === "__new__" ? videoBadgeNewLabel.trim() : videoBadgeSelect.trim();
+      if (videoForm.program_id) {
+        await applyProgramBadge(videoForm.program_id, "video", selectedVideoBadgeLabel, videoBadgeBg, videoBadgeText);
+      }
+      alert("動画を作成しました");
+      setCreatingVideo(false);
+      setVideoForm({
+        title: "",
+        description: "",
+        youtube_url: "",
+        program_id: "",
+        visibility: "free",
+        content_tier: "basic",
+        is_published: true,
+      });
+      setVideoKeywordTags([]);
+      setVideoBadgeSelect("");
+      setVideoBadgeNewLabel("");
+      setVideoBadgeBg("#f59e0b");
+      setVideoBadgeText("#ffffff");
+      setVideoSlideIds([]);
+      loadVideos();
+      loadPrograms();
+    } catch (err) {
+      alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSavingVideo(false);
+    }
+  }
+
+  async function handleCreateQuickProgram(e: React.FormEvent) {
+    e.preventDefault();
+    const name = quickProgramName.trim();
+    if (!name) {
+      alert("シリーズ名を入力してください");
+      return;
+    }
+    const slug = quickProgramSlug.trim() || slugFromName(name);
+    setSavingQuickProgram(true);
+    try {
+      const { data, error } = await supabase
+        .from("programs")
+        .insert({
+          name,
+          slug,
+          genre_type: genreTypes[0]?.id ?? "program",
+          description: null,
+          started_year: null,
+          shelf_badge_label: null,
+          slide_badge_label: null,
+          slide_badge_bg: null,
+          slide_badge_text: null,
+          video_badge_label: null,
+          video_badge_bg: null,
+          video_badge_text: null,
+          show_on_front: true,
+        })
+        .select("id, name")
+        .single();
+      if (error) throw error;
+      await loadPrograms();
+      if (data?.id != null) {
+        handleProgramChangedForVideo(String(data.id));
+      }
+      setCreatingQuickProgram(false);
+      setQuickProgramName("");
+      setQuickProgramSlug("");
+    } catch (err) {
+      alert(`シリーズ追加失敗: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSavingQuickProgram(false);
+    }
+  }
+
+  async function handleDeleteVideo(videoId: string) {
+    if (!confirm("この動画を削除しますか？")) return;
+    try {
+      const res = await fetch(`/api/admin/videos/${encodeURIComponent(videoId)}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(`削除失敗: ${json.error ?? "エラー"}`);
+        return;
+      }
+      loadVideos();
+    } catch (err) {
+      alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  function handleStartEditVideo(video: (typeof videos)[0]) {
+    setCreatingVideo(false);
+    setEditingVideo(video);
+    setVideoEditForm({
+      title: video.title ?? "",
+      description: video.description ?? "",
+      youtube_url: video.youtube_url ?? "",
+      program_id: String(video.program_id ?? ""),
+      visibility: (video.visibility ?? "free") as SlideVisibility,
+      content_tier: (video.content_tier ?? "basic") as ContentTier,
+      is_published: video.is_published !== false,
+    });
+    setVideoEditKeywordTags(Array.isArray(video.keyword_tags) ? video.keyword_tags : []);
+    setVideoEditSlideIds((video.slide_ids ?? []).map((id) => Number(id)).filter((id) => Number.isFinite(id)));
+    const p = programs.find((row) => String(row.id) === String(video.program_id));
+    const label = p?.video_badge_label?.trim() ?? "";
+    const inOptions = !!label && videoBadgeOptions.includes(label);
+    setVideoEditBadgeSelect(inOptions ? label : label ? "__new__" : "");
+    setVideoEditBadgeNewLabel(inOptions ? "" : label);
+    setVideoEditBadgeBg(p?.video_badge_bg ?? "#f59e0b");
+    setVideoEditBadgeText(p?.video_badge_text ?? "#ffffff");
+  }
+
+  async function handleUpdateVideo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingVideo) return;
+    if (!videoEditForm.title.trim() || !videoEditForm.youtube_url.trim() || !videoEditForm.program_id) {
+      alert("タイトル・動画URL・シリーズは必須です");
+      return;
+    }
+    setSavingVideo(true);
+    try {
+      const res = await fetch(`/api/admin/videos/${encodeURIComponent(editingVideo.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: videoEditForm.title.trim(),
+          description: videoEditForm.description.trim() || null,
+          keyword_tags: videoEditKeywordTags,
+          youtube_url: videoEditForm.youtube_url.trim(),
+          program_id: Number(videoEditForm.program_id),
+          visibility: videoEditForm.visibility,
+          content_tier: videoEditForm.content_tier,
+          is_published: videoEditForm.is_published,
+          slide_ids: videoEditSlideIds,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(`動画更新失敗: ${json.error ?? "エラー"}`);
+        return;
+      }
+      const selectedVideoBadgeLabel =
+        videoEditBadgeSelect === "__new__" ? videoEditBadgeNewLabel.trim() : videoEditBadgeSelect.trim();
+      if (videoEditForm.program_id) {
+        await applyProgramBadge(videoEditForm.program_id, "video", selectedVideoBadgeLabel, videoEditBadgeBg, videoEditBadgeText);
+      }
+      setEditingVideo(null);
+      await loadPrograms();
+      await loadVideos();
+      alert("動画を更新しました");
+    } catch (err) {
+      alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSavingVideo(false);
     }
   }
 
@@ -446,7 +974,7 @@ export default function AdminPage() {
   async function loadPrograms() {
     const { data } = await supabase
       .from("programs")
-      .select("id, name, slug, description, started_year, genre_type, show_on_front")
+      .select("id, name, slug, description, started_year, shelf_badge_label, slide_badge_label, slide_badge_bg, slide_badge_text, video_badge_label, video_badge_bg, video_badge_text, genre_type, show_on_front")
       .order("started_year", { ascending: true, nullsFirst: false });
     setPrograms((data ?? []) as Program[]);
   }
@@ -459,6 +987,88 @@ export default function AdminPage() {
       .replace(/[^a-z0-9-]/g, "")
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "") || "program";
+  }
+
+  const slideBadgeOptions = Array.from(
+    new Set(
+      programs
+        .map((p) => p.slide_badge_label?.trim() ?? "")
+        .filter((v) => v.length > 0)
+    )
+  );
+  const videoBadgeOptions = Array.from(
+    new Set(
+      programs
+        .map((p) => p.video_badge_label?.trim() ?? "")
+        .filter((v) => v.length > 0)
+    )
+  );
+
+  function handleProgramChangedForSlide(programId: string) {
+    setCreateForm((f) => ({ ...f, program_id: programId }));
+    const p = programs.find((row) => String(row.id) === String(programId));
+    const label = p?.slide_badge_label?.trim() ?? "";
+    const inOptions = !!label && slideBadgeOptions.includes(label);
+    setSlideBadgeSelect(inOptions ? label : label ? "__new__" : "");
+    setSlideBadgeNewLabel(inOptions ? "" : label);
+    setSlideBadgeBg(p?.slide_badge_bg ?? "#f59e0b");
+    setSlideBadgeText(p?.slide_badge_text ?? "#ffffff");
+  }
+
+  function handleProgramChangedForVideo(programId: string) {
+    setVideoForm((f) => ({ ...f, program_id: programId }));
+    const p = programs.find((row) => String(row.id) === String(programId));
+    const label = p?.video_badge_label?.trim() ?? "";
+    const inOptions = !!label && videoBadgeOptions.includes(label);
+    setVideoBadgeSelect(inOptions ? label : label ? "__new__" : "");
+    setVideoBadgeNewLabel(inOptions ? "" : label);
+    setVideoBadgeBg(p?.video_badge_bg ?? "#f59e0b");
+    setVideoBadgeText(p?.video_badge_text ?? "#ffffff");
+  }
+
+  function handleProgramChangedForSlideEdit(programId: string) {
+    setEditForm((f) => ({ ...f, program_id: programId }));
+    const p = programs.find((row) => String(row.id) === String(programId));
+    const label = p?.slide_badge_label?.trim() ?? "";
+    const inOptions = !!label && slideBadgeOptions.includes(label);
+    setSlideEditBadgeSelect(inOptions ? label : label ? "__new__" : "");
+    setSlideEditBadgeNewLabel(inOptions ? "" : label);
+    setSlideEditBadgeBg(p?.slide_badge_bg ?? "#f59e0b");
+    setSlideEditBadgeText(p?.slide_badge_text ?? "#ffffff");
+  }
+
+  function handleProgramChangedForVideoEdit(programId: string) {
+    setVideoEditForm((f) => ({ ...f, program_id: programId }));
+    const p = programs.find((row) => String(row.id) === String(programId));
+    const label = p?.video_badge_label?.trim() ?? "";
+    const inOptions = !!label && videoBadgeOptions.includes(label);
+    setVideoEditBadgeSelect(inOptions ? label : label ? "__new__" : "");
+    setVideoEditBadgeNewLabel(inOptions ? "" : label);
+    setVideoEditBadgeBg(p?.video_badge_bg ?? "#f59e0b");
+    setVideoEditBadgeText(p?.video_badge_text ?? "#ffffff");
+  }
+
+  async function applyProgramBadge(
+    programId: string,
+    kind: "slide" | "video",
+    label: string,
+    bg: string,
+    text: string
+  ) {
+    const payload =
+      kind === "slide"
+        ? {
+            slide_badge_label: label || null,
+            slide_badge_bg: label ? bg : null,
+            slide_badge_text: label ? text : null,
+          }
+        : {
+            video_badge_label: label || null,
+            video_badge_bg: label ? bg : null,
+            video_badge_text: label ? text : null,
+          };
+    const { error } = await supabase.from("programs").update(payload).eq("id", programId);
+    if (error) throw error;
   }
 
   async function handleCreateProgram(e: React.FormEvent) {
@@ -477,11 +1087,30 @@ export default function AdminPage() {
         genre_type: programForm.genre_type,
         description: programForm.description.trim() || null,
         started_year: programForm.started_year ? parseInt(programForm.started_year, 10) : null,
+        slide_badge_label: programForm.slide_badge_label.trim() || null,
+        slide_badge_bg: programForm.slide_badge_label.trim() ? programForm.slide_badge_bg : null,
+        slide_badge_text: programForm.slide_badge_label.trim() ? programForm.slide_badge_text : null,
+        video_badge_label: programForm.video_badge_label.trim() || null,
+        video_badge_bg: programForm.video_badge_label.trim() ? programForm.video_badge_bg : null,
+        video_badge_text: programForm.video_badge_label.trim() ? programForm.video_badge_text : null,
         show_on_front: programForm.show_on_front,
       });
       if (error) throw error;
       setCreatingProgram(false);
-      setProgramForm({ name: "", slug: "", genre_type: genreTypes[0]?.id ?? "program", description: "", started_year: "", show_on_front: true });
+      setProgramForm({
+        name: "",
+        slug: "",
+        genre_type: genreTypes[0]?.id ?? "program",
+        description: "",
+        started_year: "",
+        slide_badge_label: "",
+        slide_badge_bg: "#f59e0b",
+        slide_badge_text: "#ffffff",
+        video_badge_label: "",
+        video_badge_bg: "#f59e0b",
+        video_badge_text: "#ffffff",
+        show_on_front: true,
+      });
       loadPrograms();
     } catch (err) {
       alert(`登録失敗: ${err instanceof Error ? err.message : String(err)}`);
@@ -600,12 +1229,31 @@ export default function AdminPage() {
           genre_type: programForm.genre_type,
           description: programForm.description.trim() || null,
           started_year: programForm.started_year ? parseInt(programForm.started_year, 10) : null,
+          slide_badge_label: programForm.slide_badge_label.trim() || null,
+          slide_badge_bg: programForm.slide_badge_label.trim() ? programForm.slide_badge_bg : null,
+          slide_badge_text: programForm.slide_badge_label.trim() ? programForm.slide_badge_text : null,
+          video_badge_label: programForm.video_badge_label.trim() || null,
+          video_badge_bg: programForm.video_badge_label.trim() ? programForm.video_badge_bg : null,
+          video_badge_text: programForm.video_badge_label.trim() ? programForm.video_badge_text : null,
           show_on_front: programForm.show_on_front,
         })
         .eq("id", editingProgram.id);
       if (error) throw error;
       setEditingProgram(null);
-      setProgramForm({ name: "", slug: "", genre_type: genreTypes[0]?.id ?? "program", description: "", started_year: "", show_on_front: true });
+      setProgramForm({
+        name: "",
+        slug: "",
+        genre_type: genreTypes[0]?.id ?? "program",
+        description: "",
+        started_year: "",
+        slide_badge_label: "",
+        slide_badge_bg: "#f59e0b",
+        slide_badge_text: "#ffffff",
+        video_badge_label: "",
+        video_badge_bg: "#f59e0b",
+        video_badge_text: "#ffffff",
+        show_on_front: true,
+      });
       loadPrograms();
     } catch (err) {
       alert(`更新失敗: ${err instanceof Error ? err.message : String(err)}`);
@@ -661,11 +1309,23 @@ export default function AdminPage() {
         return;
       }
 
+      const selectedSlideBadgeLabel =
+        slideBadgeSelect === "__new__" ? slideBadgeNewLabel.trim() : slideBadgeSelect.trim();
+      if (createForm.program_id) {
+        await applyProgramBadge(createForm.program_id, "slide", selectedSlideBadgeLabel, slideBadgeBg, slideBadgeText);
+      }
+
       alert(`作成完了: ${json.pageCount}ページ`);
       setCreateForm({ title: "", program_id: "", year: "", caption: "", visibility: "free", content_tier: "basic" });
       setKeywordTags([]);
+      setSlideBadgeSelect("");
+      setSlideBadgeNewLabel("");
+      setSlideBadgeBg("#f59e0b");
+      setSlideBadgeText("#ffffff");
+      setSelectedPdfName("");
       fileInput.value = "";
       loadSlides();
+      loadPrograms();
     } catch (err) {
       alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -724,9 +1384,9 @@ export default function AdminPage() {
       alert("PDFファイルを選択してください");
       return;
     }
-    const fourMB = 4 * 1024 * 1024;
-    if (file.size > fourMB) {
-      if (!confirm(`PDFが約4MBを超えています（${(file.size / 1024 / 1024).toFixed(1)}MB）。本番では約4.5MBの制限で失敗することがあります。続行しますか？`)) {
+    const fiftyMB = 50 * 1024 * 1024;
+    if (file.size > fiftyMB) {
+      if (!confirm(`PDFが約50MBを超えています（${(file.size / 1024 / 1024).toFixed(1)}MB）。ローカルでは上限設定を上げれば処理できますが、本番では失敗する可能性があります。続行しますか？`)) {
         return;
       }
     }
@@ -749,7 +1409,7 @@ export default function AdminPage() {
         if (res.status === 413) {
           json = {
             error: "PDFが大きすぎます",
-            message: "本番環境ではリクエストサイズの制限（約4.5MB）があります。PDFを小さくするか、キャプションを手動で入力してください。",
+            message: "アップロードサイズ制限を超えています。ローカルでは next.config.ts の proxyClientMaxBodySize を、本番ではホスティング側の上限を確認してください。",
           };
         } else {
           json = { error: "レスポンスの解析に失敗しました", details: `HTTP ${res.status}` };
@@ -806,6 +1466,13 @@ export default function AdminPage() {
       visibility: (slide.visibility as SlideVisibility) || "private",
       content_tier: (slide.content_tier as ContentTier) || "basic",
     });
+    const p = programs.find((row) => String(row.id) === String(slide.program_id));
+    const label = p?.slide_badge_label?.trim() ?? "";
+    const inOptions = !!label && slideBadgeOptions.includes(label);
+    setSlideEditBadgeSelect(inOptions ? label : label ? "__new__" : "");
+    setSlideEditBadgeNewLabel(inOptions ? "" : label);
+    setSlideEditBadgeBg(p?.slide_badge_bg ?? "#f59e0b");
+    setSlideEditBadgeText(p?.slide_badge_text ?? "#ffffff");
   }
 
   async function handleSaveEdit(e: React.FormEvent) {
@@ -835,7 +1502,13 @@ export default function AdminPage() {
         alert(`更新失敗: ${json.error}\n${json.details ?? ""}`);
         return;
       }
+      const selectedSlideBadgeLabel =
+        slideEditBadgeSelect === "__new__" ? slideEditBadgeNewLabel.trim() : slideEditBadgeSelect.trim();
+      if (editForm.program_id) {
+        await applyProgramBadge(editForm.program_id, "slide", selectedSlideBadgeLabel, slideEditBadgeBg, slideEditBadgeText);
+      }
       setEditingSlide(null);
+      await loadPrograms();
       loadSlides();
     } catch (err) {
       alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
@@ -883,6 +1556,41 @@ export default function AdminPage() {
             </Link>
             <div className="flex min-w-0 shrink-0 items-center gap-4">
               <Link
+                href="/admin/operations"
+                className="shrink-0 text-sm hover:opacity-80"
+                style={{ color: adminView === "operations" ? "var(--fg)" : "var(--fg-muted)" }}
+              >
+                運用管理
+              </Link>
+              <Link
+                href="/admin/slides"
+                className="shrink-0 text-sm hover:opacity-80"
+                style={{ color: adminView === "slides" ? "var(--fg)" : "var(--fg-muted)" }}
+              >
+                スライド管理
+              </Link>
+              <Link
+                href="/admin/videos"
+                className="shrink-0 text-sm hover:opacity-80"
+                style={{ color: adminView === "videos" ? "var(--fg)" : "var(--fg-muted)" }}
+              >
+                動画管理
+              </Link>
+              <Link
+                href="/admin/settings"
+                className="shrink-0 text-sm hover:opacity-80"
+                style={{ color: adminView === "settings" ? "var(--fg)" : "var(--fg-muted)" }}
+              >
+                フロント設定
+              </Link>
+              <Link
+                href="/admin/master"
+                className="shrink-0 text-sm hover:opacity-80"
+                style={{ color: adminView === "master" ? "var(--fg)" : "var(--fg-muted)" }}
+              >
+                マスタ管理
+              </Link>
+              <Link
                 href="/admin/guide"
                 className="shrink-0 text-sm hover:opacity-80"
                 style={{ color: "var(--fg-muted)" }}
@@ -896,13 +1604,6 @@ export default function AdminPage() {
               >
                 ビジネス・戦略ガイド
               </Link>
-              <a
-                href="#admin-announcements"
-                className="shrink-0 text-sm hover:opacity-80"
-                style={{ color: "var(--fg-muted)" }}
-              >
-                お知らせ
-              </a>
               <h1 className="shrink-0 text-xl font-bold" style={{ color: "var(--fg)" }}>
                 管理画面
               </h1>
@@ -913,9 +1614,9 @@ export default function AdminPage() {
 
       <main className="min-h-screen w-full bg-white">
         <div className="mx-auto max-w-4xl px-6 py-8">
-        {/* サイト設定（サブタイトル・フッター文言） */}
-        <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
-          <h2 className="mb-4 text-lg font-semibold text-neutral-800">サイト設定</h2>
+        {/* フロント設定（ヘッダー管理） */}
+        <section className={`mb-12 rounded-lg border border-neutral-200 bg-white p-6 ${adminView === "settings" ? "" : "hidden"}`}>
+          <h2 className="mb-4 text-lg font-semibold text-neutral-800">ヘッダー管理</h2>
           <p className="mb-6 text-sm text-neutral-600">
             トップページのヘッダー下のキャッチコピーと、フッター横のテキストを編集できます。それぞれ独立して変更可能です。
           </p>
@@ -1035,7 +1736,7 @@ export default function AdminPage() {
         </section>
 
         {/* ジャンル種別（プログラム・組織をオーガナイズ・自治体等のマスタ） */}
-        <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
+        <section className={`mb-12 rounded-lg border border-neutral-200 bg-white p-6 ${adminView === "master" ? "" : "hidden"}`}>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-neutral-800">ジャンル種別</h2>
             <button
@@ -1202,7 +1903,7 @@ export default function AdminPage() {
         </section>
 
         {/* ジャンル管理（プログラム・組織・自治体） */}
-        <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
+        <section className={`mb-12 rounded-lg border border-neutral-200 bg-white p-6 ${adminView === "master" ? "" : "hidden"}`}>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-neutral-800">ジャンル管理</h2>
             <button
@@ -1210,7 +1911,20 @@ export default function AdminPage() {
               onClick={() => {
                 setCreatingProgram(true);
                 setEditingProgram(null);
-                setProgramForm({ name: "", slug: "", genre_type: genreTypes[0]?.id ?? "program", description: "", started_year: "", show_on_front: true });
+                setProgramForm({
+                  name: "",
+                  slug: "",
+                  genre_type: genreTypes[0]?.id ?? "program",
+                  description: "",
+                  started_year: "",
+                  slide_badge_label: "",
+                  slide_badge_bg: "#f59e0b",
+                  slide_badge_text: "#ffffff",
+                  video_badge_label: "",
+                  video_badge_bg: "#f59e0b",
+                  video_badge_text: "#ffffff",
+                  show_on_front: true,
+                });
               }}
               className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
             >
@@ -1254,6 +1968,12 @@ export default function AdminPage() {
                             genre_type: p.genre_type || "program",
                             description: p.description ?? "",
                             started_year: p.started_year != null ? String(p.started_year) : "",
+                            slide_badge_label: p.slide_badge_label ?? "",
+                            slide_badge_bg: p.slide_badge_bg ?? "#f59e0b",
+                            slide_badge_text: p.slide_badge_text ?? "#ffffff",
+                            video_badge_label: p.video_badge_label ?? "",
+                            video_badge_bg: p.video_badge_bg ?? "#f59e0b",
+                            video_badge_text: p.video_badge_text ?? "#ffffff",
                             show_on_front: p.show_on_front !== false,
                           });
                         }}
@@ -1326,6 +2046,48 @@ export default function AdminPage() {
                   className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
                 />
               </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 rounded border border-neutral-200 bg-white p-3">
+                  <label className="block text-xs font-medium text-neutral-700">スライド用バッジ（任意）</label>
+                  <input
+                    type="text"
+                    value={programForm.slide_badge_label}
+                    onChange={(e) => setProgramForm((f) => ({ ...f, slide_badge_label: e.target.value }))}
+                    placeholder="例: ABL / 講演"
+                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-[11px] text-neutral-600">
+                      背景色
+                      <input type="color" value={programForm.slide_badge_bg} onChange={(e) => setProgramForm((f) => ({ ...f, slide_badge_bg: e.target.value }))} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                    </label>
+                    <label className="text-[11px] text-neutral-600">
+                      文字色
+                      <input type="color" value={programForm.slide_badge_text} onChange={(e) => setProgramForm((f) => ({ ...f, slide_badge_text: e.target.value }))} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                    </label>
+                  </div>
+                </div>
+                <div className="space-y-2 rounded border border-neutral-200 bg-white p-3">
+                  <label className="block text-xs font-medium text-neutral-700">動画用バッジ（任意）</label>
+                  <input
+                    type="text"
+                    value={programForm.video_badge_label}
+                    onChange={(e) => setProgramForm((f) => ({ ...f, video_badge_label: e.target.value }))}
+                    placeholder="例: 動画教材 / 対談"
+                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-[11px] text-neutral-600">
+                      背景色
+                      <input type="color" value={programForm.video_badge_bg} onChange={(e) => setProgramForm((f) => ({ ...f, video_badge_bg: e.target.value }))} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                    </label>
+                    <label className="text-[11px] text-neutral-600">
+                      文字色
+                      <input type="color" value={programForm.video_badge_text} onChange={(e) => setProgramForm((f) => ({ ...f, video_badge_text: e.target.value }))} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                    </label>
+                  </div>
+                </div>
+              </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-neutral-600">開始年（任意）</label>
                 <input
@@ -1364,7 +2126,20 @@ export default function AdminPage() {
                   type="button"
                   onClick={() => {
                     setCreatingProgram(false);
-                    setProgramForm({ name: "", slug: "", genre_type: genreTypes[0]?.id ?? "program", description: "", started_year: "", show_on_front: true });
+                    setProgramForm({
+                      name: "",
+                      slug: "",
+                      genre_type: genreTypes[0]?.id ?? "program",
+                      description: "",
+                      started_year: "",
+                      slide_badge_label: "",
+                      slide_badge_bg: "#f59e0b",
+                      slide_badge_text: "#ffffff",
+                      video_badge_label: "",
+                      video_badge_bg: "#f59e0b",
+                      video_badge_text: "#ffffff",
+                      show_on_front: true,
+                    });
                   }}
                   className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
                 >
@@ -1441,6 +2216,46 @@ export default function AdminPage() {
                       className="w-full rounded border border-neutral-300 px-3 py-2 text-neutral-900"
                     />
                   </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2 rounded border border-neutral-200 bg-neutral-50 p-3">
+                      <label className="block text-sm font-medium text-neutral-700">スライド用バッジ（任意）</label>
+                      <input
+                        type="text"
+                        value={programForm.slide_badge_label}
+                        onChange={(e) => setProgramForm((f) => ({ ...f, slide_badge_label: e.target.value }))}
+                        className="w-full rounded border border-neutral-300 px-3 py-2 text-neutral-900"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="text-xs text-neutral-600">
+                          背景色
+                          <input type="color" value={programForm.slide_badge_bg} onChange={(e) => setProgramForm((f) => ({ ...f, slide_badge_bg: e.target.value }))} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                        </label>
+                        <label className="text-xs text-neutral-600">
+                          文字色
+                          <input type="color" value={programForm.slide_badge_text} onChange={(e) => setProgramForm((f) => ({ ...f, slide_badge_text: e.target.value }))} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                        </label>
+                      </div>
+                    </div>
+                    <div className="space-y-2 rounded border border-neutral-200 bg-neutral-50 p-3">
+                      <label className="block text-sm font-medium text-neutral-700">動画用バッジ（任意）</label>
+                      <input
+                        type="text"
+                        value={programForm.video_badge_label}
+                        onChange={(e) => setProgramForm((f) => ({ ...f, video_badge_label: e.target.value }))}
+                        className="w-full rounded border border-neutral-300 px-3 py-2 text-neutral-900"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="text-xs text-neutral-600">
+                          背景色
+                          <input type="color" value={programForm.video_badge_bg} onChange={(e) => setProgramForm((f) => ({ ...f, video_badge_bg: e.target.value }))} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                        </label>
+                        <label className="text-xs text-neutral-600">
+                          文字色
+                          <input type="color" value={programForm.video_badge_text} onChange={(e) => setProgramForm((f) => ({ ...f, video_badge_text: e.target.value }))} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
                   <div>
                     <label className="mb-1 block text-sm font-medium text-neutral-600">開始年（任意）</label>
                     <input
@@ -1488,8 +2303,414 @@ export default function AdminPage() {
           )}
         </section>
 
+        {/* フロント設定: シリーズ棚管理 */}
+        <section className={`mb-12 rounded-lg border border-neutral-200 bg-white p-6 ${adminView === "settings" ? "" : "hidden"}`}>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-neutral-800">シリーズ棚管理</h2>
+            <button
+              type="button"
+              onClick={() => {
+                setCreatingShelf(true);
+                setEditingShelf(null);
+                setShelfForm({ title: "", slug: "", description: "", sort_order: 0, is_published: true });
+                setShelfSlideIds([]);
+                setShelfVideoIds([]);
+              }}
+              className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            >
+              新規棚を追加
+            </button>
+          </div>
+          <p className="mb-4 text-sm text-neutral-600">
+            トップページの「特集棚」に表示する棚を管理します。1つの棚にスライドと動画を混在できます。
+          </p>
+
+          {loadingShelves ? (
+            <p className="text-sm text-neutral-500">読み込み中...</p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-neutral-200">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-neutral-200 bg-neutral-50">
+                  <tr>
+                    <th className="px-4 py-3 font-medium text-neutral-700">タイトル</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">slug</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">公開</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">並び順</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">アイテム数</th>
+                    <th className="w-36 px-4 py-3 font-medium text-neutral-700">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shelves.map((shelf) => (
+                    <tr key={shelf.id} className="border-b border-neutral-100 last:border-0">
+                      <td className="px-4 py-3 font-medium text-neutral-800">{shelf.title}</td>
+                      <td className="px-4 py-3 text-neutral-600">{shelf.slug}</td>
+                      <td className="px-4 py-3 text-neutral-600">{shelf.is_published ? "公開" : "非公開"}</td>
+                      <td className="px-4 py-3 text-neutral-600">{shelf.sort_order}</td>
+                      <td className="px-4 py-3 text-neutral-600">{shelf.items?.length ?? 0}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingShelf(shelf);
+                              setCreatingShelf(false);
+                              setShelfForm({
+                                title: shelf.title,
+                                slug: shelf.slug,
+                                description: shelf.description ?? "",
+                                sort_order: shelf.sort_order ?? 0,
+                                is_published: shelf.is_published !== false,
+                              });
+                              const slideIds = (shelf.items ?? []).filter((it) => it.content_type === "slide").map((it) => String(it.content_id));
+                              const videoIds = (shelf.items ?? []).filter((it) => it.content_type === "video").map((it) => String(it.content_id));
+                              setShelfSlideIds(slideIds);
+                              setShelfVideoIds(videoIds);
+                            }}
+                            className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                          >
+                            編集
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteShelf(shelf.id)}
+                            className="rounded border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                          >
+                            削除
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {creatingShelf && (
+            <form onSubmit={handleCreateShelf} className="mt-6 space-y-4 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+              <h3 className="text-sm font-semibold text-neutral-800">新規棚</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-600">棚タイトル *</label>
+                  <input
+                    type="text"
+                    value={shelfForm.title}
+                    onChange={(e) => setShelfForm((f) => ({ ...f, title: e.target.value }))}
+                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-600">slug（任意）</label>
+                  <input
+                    type="text"
+                    value={shelfForm.slug}
+                    onChange={(e) => setShelfForm((f) => ({ ...f, slug: e.target.value }))}
+                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                    placeholder="ai-feature"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">説明（任意）</label>
+                <input
+                  type="text"
+                  value={shelfForm.description}
+                  onChange={(e) => setShelfForm((f) => ({ ...f, description: e.target.value }))}
+                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-600">並び順</label>
+                  <input
+                    type="number"
+                    value={shelfForm.sort_order}
+                    onChange={(e) => setShelfForm((f) => ({ ...f, sort_order: Number(e.target.value) || 0 }))}
+                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <input
+                    id="shelf_is_published_new"
+                    type="checkbox"
+                    checked={shelfForm.is_published}
+                    onChange={(e) => setShelfForm((f) => ({ ...f, is_published: e.target.checked }))}
+                    className="h-4 w-4 rounded border-neutral-300"
+                  />
+                  <label htmlFor="shelf_is_published_new" className="text-xs font-medium text-neutral-600">公開する</label>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="mb-2 text-xs font-medium text-neutral-600">スライド（複数選択）</p>
+                  <div className="max-h-44 space-y-1 overflow-y-auto rounded border border-neutral-300 bg-white p-2">
+                    {slides.map((s) => {
+                      const checked = shelfSlideIds.includes(String(s.id));
+                      return (
+                        <label key={`shelf-slide-${s.id}`} className="flex items-center gap-2 text-xs text-neutral-700">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              if (e.target.checked) setShelfSlideIds((prev) => [...prev, String(s.id)]);
+                              else setShelfSlideIds((prev) => prev.filter((id) => id !== String(s.id)));
+                            }}
+                          />
+                          <span className="truncate">{s.title}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-xs font-medium text-neutral-600">動画（複数選択）</p>
+                  <div className="max-h-44 space-y-1 overflow-y-auto rounded border border-neutral-300 bg-white p-2">
+                    {videos.map((v) => {
+                      const checked = shelfVideoIds.includes(String(v.id));
+                      return (
+                        <label key={`shelf-video-${v.id}`} className="flex items-center gap-2 text-xs text-neutral-700">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              if (e.target.checked) setShelfVideoIds((prev) => [...prev, String(v.id)]);
+                              else setShelfVideoIds((prev) => prev.filter((id) => id !== String(v.id)));
+                            }}
+                          />
+                          <span className="truncate">{v.title}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={savingShelf}
+                  className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  {savingShelf ? "作成中..." : "作成"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreatingShelf(false)}
+                  className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </form>
+          )}
+
+          {editingShelf && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+              onClick={() => !savingShelf && setEditingShelf(null)}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="shelf-edit-title"
+            >
+              <div
+                className="w-full max-w-2xl rounded-lg border border-neutral-200 bg-white p-6 shadow-lg"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 id="shelf-edit-title" className="mb-4 text-lg font-semibold text-neutral-800">棚を編集</h3>
+                <form onSubmit={handleUpdateShelf} className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-neutral-600">棚タイトル *</label>
+                      <input
+                        type="text"
+                        value={shelfForm.title}
+                        onChange={(e) => setShelfForm((f) => ({ ...f, title: e.target.value }))}
+                        className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-neutral-600">slug</label>
+                      <input
+                        type="text"
+                        value={shelfForm.slug}
+                        onChange={(e) => setShelfForm((f) => ({ ...f, slug: e.target.value }))}
+                        className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">説明（任意）</label>
+                    <input
+                      type="text"
+                      value={shelfForm.description}
+                      onChange={(e) => setShelfForm((f) => ({ ...f, description: e.target.value }))}
+                      className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                    />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <p className="mb-2 text-xs font-medium text-neutral-600">スライド</p>
+                      <div className="max-h-36 space-y-1 overflow-y-auto rounded border border-neutral-300 bg-white p-2">
+                        {slides.map((s) => (
+                          <label key={`shelf-edit-slide-${s.id}`} className="flex items-center gap-2 text-xs text-neutral-700">
+                            <input
+                              type="checkbox"
+                              checked={shelfSlideIds.includes(String(s.id))}
+                              onChange={(e) => {
+                                if (e.target.checked) setShelfSlideIds((prev) => [...prev, String(s.id)]);
+                                else setShelfSlideIds((prev) => prev.filter((id) => id !== String(s.id)));
+                              }}
+                            />
+                            <span className="truncate">{s.title}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-2 text-xs font-medium text-neutral-600">動画</p>
+                      <div className="max-h-36 space-y-1 overflow-y-auto rounded border border-neutral-300 bg-white p-2">
+                        {videos.map((v) => (
+                          <label key={`shelf-edit-video-${v.id}`} className="flex items-center gap-2 text-xs text-neutral-700">
+                            <input
+                              type="checkbox"
+                              checked={shelfVideoIds.includes(String(v.id))}
+                              onChange={(e) => {
+                                if (e.target.checked) setShelfVideoIds((prev) => [...prev, String(v.id)]);
+                                else setShelfVideoIds((prev) => prev.filter((id) => id !== String(v.id)));
+                              }}
+                            />
+                            <span className="truncate">{v.title}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="inline-flex items-center gap-2 text-xs font-medium text-neutral-600">
+                      <input
+                        type="checkbox"
+                        checked={shelfForm.is_published}
+                        onChange={(e) => setShelfForm((f) => ({ ...f, is_published: e.target.checked }))}
+                        className="h-4 w-4 rounded border-neutral-300"
+                      />
+                      公開する
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingShelf(null)}
+                        className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                      >
+                        キャンセル
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={savingShelf}
+                        className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                      >
+                        {savingShelf ? "保存中..." : "保存"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* フロント設定: トップ棚の順序管理 */}
+        <section className={`mb-12 rounded-lg border border-neutral-200 bg-white p-6 ${adminView === "settings" ? "" : "hidden"}`}>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-neutral-800">トップ棚の順序管理</h2>
+            <button
+              type="button"
+              onClick={saveFrontShelfOrder}
+              disabled={savingFrontShelfOrder || loadingFrontShelfOrder}
+              className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+            >
+              {savingFrontShelfOrder ? "保存中..." : "順序を保存"}
+            </button>
+          </div>
+          <p className="mb-4 text-sm text-neutral-600">
+            固定棚（スライド・動画）とシリーズ棚を、同じ一覧で順序変更できます。フロント側での並び順にそのまま反映されます。
+          </p>
+          <p className="mb-4 text-xs text-neutral-500">
+            各行をドラッグ＆ドロップして並び替えてから「順序を保存」を押してください。
+          </p>
+          {loadingFrontShelfOrder ? (
+            <p className="text-sm text-neutral-500">読み込み中...</p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-neutral-200">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-neutral-200 bg-neutral-50">
+                  <tr>
+                    <th className="w-16 px-4 py-3 font-medium text-neutral-700">移動</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">表示</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">棚</th>
+                    <th className="w-28 px-4 py-3 font-medium text-neutral-700">順序</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {frontShelfOrder.map((row, index) => (
+                    <tr
+                      key={row.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        setDraggingFrontShelfId(row.id);
+                        setDragOverFrontShelfId(row.id);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverFrontShelfId !== row.id) setDragOverFrontShelfId(row.id);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggingFrontShelfId) {
+                          reorderFrontShelfRows(draggingFrontShelfId, row.id);
+                        }
+                        setDraggingFrontShelfId(null);
+                        setDragOverFrontShelfId(null);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingFrontShelfId(null);
+                        setDragOverFrontShelfId(null);
+                      }}
+                      className={`border-b border-neutral-100 last:border-0 ${
+                        draggingFrontShelfId === row.id ? "opacity-60" : ""
+                      } ${dragOverFrontShelfId === row.id ? "bg-sky-50/50" : ""}`}
+                    >
+                      <td className="cursor-move px-4 py-3 text-neutral-500" title="ドラッグして並び替え">
+                        ⋮⋮
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={row.is_enabled}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setFrontShelfOrder((prev) =>
+                              prev.map((r) => (r.id === row.id ? { ...r, is_enabled: checked } : r)),
+                            );
+                          }}
+                          className="h-4 w-4 rounded border-neutral-300"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-neutral-800">{row.label}</td>
+                      <td className="px-4 py-3 text-xs text-neutral-500">#{index + 1}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
         {/* 招待コード管理 */}
-        <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
+        <section className={`mb-12 rounded-lg border border-neutral-200 bg-white p-6 ${adminView === "operations" ? "" : "hidden"}`}>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-neutral-800">招待コード管理</h2>
             <button
@@ -1748,7 +2969,7 @@ export default function AdminPage() {
         {/* お知らせ管理 */}
         <section
           id="admin-announcements"
-          className="mb-12 rounded-lg border border-neutral-200 bg-white p-6"
+          className={`mb-12 rounded-lg border border-neutral-200 bg-white p-6 ${adminView === "operations" ? "" : "hidden"}`}
         >
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-neutral-800">お知らせ管理</h2>
@@ -2044,7 +3265,7 @@ export default function AdminPage() {
         </section>
 
         {/* お問い合わせ管理 */}
-        <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
+        <section className={`mb-12 rounded-lg border border-neutral-200 bg-white p-6 ${adminView === "operations" ? "" : "hidden"}`}>
           <h2 className="mb-4 text-lg font-semibold text-neutral-800">お問い合わせ管理</h2>
           <p className="mb-4 text-sm text-neutral-600">
             ユーザーからのお問い合わせ一覧です。行をクリックして詳細を表示し、返信できます。
@@ -2173,8 +3394,454 @@ export default function AdminPage() {
           </div>
         )}
 
+        <section className={`mb-12 rounded-lg border border-neutral-200 bg-white p-6 ${adminView === "videos" ? "" : "hidden"}`}>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-neutral-800">動画管理</h2>
+            <button
+              type="button"
+              onClick={() => {
+                setCreatingVideo(true);
+                setEditingVideo(null);
+                setVideoForm({
+                  title: "",
+                  description: "",
+                  youtube_url: "",
+                  program_id: "",
+                  visibility: "free",
+                  content_tier: "basic",
+                  is_published: true,
+                });
+                setVideoKeywordTags([]);
+                setVideoBadgeSelect("");
+                setVideoBadgeNewLabel("");
+                setVideoBadgeBg("#f59e0b");
+                setVideoBadgeText("#ffffff");
+                setVideoSlideIds([]);
+              }}
+              className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            >
+              新規動画
+            </button>
+          </div>
+          <p className="mb-4 text-sm text-neutral-600">
+            動画をシリーズに紐づけて管理します。関連スライドは複数選択できます。
+          </p>
+
+          {loadingVideos ? (
+            <p className="text-sm text-neutral-500">読み込み中...</p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-neutral-200">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-neutral-200 bg-neutral-50">
+                  <tr>
+                    <th className="px-4 py-3 font-medium text-neutral-700">タイトル</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">シリーズ</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">公開</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">階層</th>
+                    <th className="px-4 py-3 font-medium text-neutral-700">関連</th>
+                    <th className="w-28 px-4 py-3 font-medium text-neutral-700">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {videos.map((v) => (
+                    <tr key={v.id} className="border-b border-neutral-100 last:border-0">
+                      <td className="max-w-[280px] truncate px-4 py-3 text-neutral-800" title={v.title}>
+                        <a href={v.youtube_url} target="_blank" rel="noreferrer" className="hover:underline">
+                          {v.title}
+                        </a>
+                      </td>
+                      <td className="px-4 py-3 text-neutral-600">
+                        {programs.find((p) => String(p.id) === String(v.program_id))?.name ?? String(v.program_id)}
+                      </td>
+                      <td className="px-4 py-3 text-neutral-600">{v.is_published ? "公開" : "下書き"}</td>
+                      <td className="px-4 py-3 text-neutral-600">{CONTENT_TIER_LABELS[v.content_tier] ?? v.content_tier}</td>
+                      <td className="px-4 py-3 text-neutral-600">{v.slide_ids?.length ?? 0}件</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditVideo(v)}
+                            className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                          >
+                            編集
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteVideo(v.id)}
+                            className="rounded border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                          >
+                            削除
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {creatingVideo && (
+            <form onSubmit={handleCreateVideo} className="mt-6 space-y-4 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+              <h3 className="text-sm font-semibold text-neutral-800">新規動画</h3>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">タイトル *</label>
+                <input
+                  type="text"
+                  value={videoForm.title}
+                  onChange={(e) => setVideoForm((f) => ({ ...f, title: e.target.value }))}
+                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">キャプション（概要）</label>
+                <textarea
+                  value={videoForm.description}
+                  onChange={(e) => setVideoForm((f) => ({ ...f, description: e.target.value }))}
+                  rows={3}
+                  placeholder="動画棚のホバー時に表示する説明文"
+                  className="w-full resize-y rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">動画URL *</label>
+                <input
+                  type="url"
+                  value={videoForm.youtube_url}
+                  onChange={(e) => setVideoForm((f) => ({ ...f, youtube_url: e.target.value }))}
+                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">キーワードタグ</label>
+                <KeywordTagInput
+                  tags={videoKeywordTags}
+                  onChange={setVideoKeywordTags}
+                  placeholder="タグを入力してEnter/カンマで追加"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">シリーズ *</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={videoForm.program_id}
+                    onChange={(e) => handleProgramChangedForVideo(e.target.value)}
+                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                    required
+                  >
+                    <option value="">選択してください</option>
+                    {programs.map((p) => (
+                      <option key={String(p.id)} value={String(p.id)}>{p.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setCreatingQuickProgram(true)}
+                    className="shrink-0 rounded border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                  >
+                    ＋新規シリーズ追加
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2 rounded border border-neutral-200 bg-white p-3">
+                <label className="block text-xs font-medium text-neutral-700">動画バッジ（任意）</label>
+                <select
+                  value={videoBadgeSelect}
+                  onChange={(e) => setVideoBadgeSelect(e.target.value)}
+                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                >
+                  <option value="">未設定（非表示）</option>
+                  {videoBadgeOptions.map((label) => (
+                    <option key={label} value={label}>{label}</option>
+                  ))}
+                  <option value="__new__">＋新規作成</option>
+                </select>
+                {videoBadgeSelect === "__new__" && (
+                  <input
+                    type="text"
+                    value={videoBadgeNewLabel}
+                    onChange={(e) => setVideoBadgeNewLabel(e.target.value)}
+                    placeholder="新しいバッジ名"
+                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  />
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-[11px] text-neutral-600">
+                    背景色
+                    <input type="color" value={videoBadgeBg} onChange={(e) => setVideoBadgeBg(e.target.value)} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                  </label>
+                  <label className="text-[11px] text-neutral-600">
+                    文字色
+                    <input type="color" value={videoBadgeText} onChange={(e) => setVideoBadgeText(e.target.value)} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                  </label>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-600">公開レベル</label>
+                  <select
+                    value={videoForm.visibility}
+                    onChange={(e) => setVideoForm((f) => ({ ...f, visibility: e.target.value as SlideVisibility }))}
+                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  >
+                    {(Object.keys(VISIBILITY_LABELS) as SlideVisibility[]).map((v) => (
+                      <option key={v} value={v}>{VISIBILITY_LABELS[v]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-600">コンテンツ階層</label>
+                  <select
+                    value={videoForm.content_tier}
+                    onChange={(e) => setVideoForm((f) => ({ ...f, content_tier: e.target.value as ContentTier }))}
+                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  >
+                    {(Object.keys(CONTENT_TIER_LABELS) as ContentTier[]).map((v) => (
+                      <option key={v} value={v}>{CONTENT_TIER_LABELS[v]}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-medium text-neutral-600">関連スライド（複数選択）</p>
+                <div className="max-h-44 space-y-1 overflow-y-auto rounded border border-neutral-300 bg-white p-2">
+                  {slides.map((s) => {
+                    const numericId = Number(s.id);
+                    const checked = videoSlideIds.includes(numericId);
+                    return (
+                      <label key={s.id} className="flex items-center gap-2 text-xs text-neutral-700">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (!Number.isFinite(numericId)) return;
+                            if (e.target.checked) {
+                              setVideoSlideIds((prev) => [...prev, numericId]);
+                            } else {
+                              setVideoSlideIds((prev) => prev.filter((id) => id !== numericId));
+                            }
+                          }}
+                        />
+                        <span className="truncate">{s.title}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="video_is_published"
+                  type="checkbox"
+                  checked={videoForm.is_published}
+                  onChange={(e) => setVideoForm((f) => ({ ...f, is_published: e.target.checked }))}
+                  className="h-4 w-4 rounded border-neutral-300"
+                />
+                <label htmlFor="video_is_published" className="text-xs font-medium text-neutral-600">公開する</label>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={savingVideo}
+                  className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  {savingVideo ? "作成中..." : "作成"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreatingVideo(false)}
+                  className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </form>
+          )}
+
+          {creatingQuickProgram && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+              onClick={() => !savingQuickProgram && setCreatingQuickProgram(false)}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="quick-program-title"
+            >
+              <div
+                className="w-full max-w-md rounded-lg border border-neutral-200 bg-white p-6 shadow-lg"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 id="quick-program-title" className="mb-4 text-lg font-semibold text-neutral-800">
+                  新規シリーズを追加
+                </h3>
+                <form onSubmit={handleCreateQuickProgram} className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-neutral-600">シリーズ名 *</label>
+                    <input
+                      type="text"
+                      value={quickProgramName}
+                      onChange={(e) => setQuickProgramName(e.target.value)}
+                      className="w-full rounded border border-neutral-300 px-3 py-2 text-neutral-900"
+                      placeholder="例: 講演"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-neutral-600">slug（任意）</label>
+                    <input
+                      type="text"
+                      value={quickProgramSlug}
+                      onChange={(e) => setQuickProgramSlug(e.target.value)}
+                      className="w-full rounded border border-neutral-300 px-3 py-2 text-neutral-900"
+                      placeholder="例: kouen"
+                    />
+                  </div>
+                  <p className="text-xs text-neutral-500">
+                    追加後、この動画フォームのシリーズに自動選択されます。
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCreatingQuickProgram(false)}
+                      className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                      disabled={savingQuickProgram}
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingQuickProgram}
+                      className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                    >
+                      {savingQuickProgram ? "追加中..." : "追加"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {editingVideo && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+              onClick={() => !savingVideo && setEditingVideo(null)}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="video-edit-title"
+            >
+              <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-neutral-200 bg-white p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+                <h3 id="video-edit-title" className="mb-4 text-lg font-semibold text-neutral-800">動画を編集</h3>
+                <form onSubmit={handleUpdateVideo} className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">タイトル *</label>
+                    <input type="text" value={videoEditForm.title} onChange={(e) => setVideoEditForm((f) => ({ ...f, title: e.target.value }))} className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900" required />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">キャプション（概要）</label>
+                    <textarea value={videoEditForm.description} onChange={(e) => setVideoEditForm((f) => ({ ...f, description: e.target.value }))} rows={3} className="w-full resize-y rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">動画URL *</label>
+                    <input type="url" value={videoEditForm.youtube_url} onChange={(e) => setVideoEditForm((f) => ({ ...f, youtube_url: e.target.value }))} className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900" required />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">キーワードタグ</label>
+                    <KeywordTagInput tags={videoEditKeywordTags} onChange={setVideoEditKeywordTags} placeholder="タグを入力してEnter/カンマで追加" />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-neutral-600">シリーズ *</label>
+                      <select value={videoEditForm.program_id} onChange={(e) => handleProgramChangedForVideoEdit(e.target.value)} className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900" required>
+                        <option value="">選択してください</option>
+                        {programs.map((p) => (<option key={String(p.id)} value={String(p.id)}>{p.name}</option>))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-neutral-600">公開レベル</label>
+                      <select value={videoEditForm.visibility} onChange={(e) => setVideoEditForm((f) => ({ ...f, visibility: e.target.value as SlideVisibility }))} className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900">
+                        {(Object.keys(VISIBILITY_LABELS) as SlideVisibility[]).map((v) => (<option key={v} value={v}>{VISIBILITY_LABELS[v]}</option>))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-2 rounded border border-neutral-200 bg-neutral-50 p-3">
+                    <label className="block text-xs font-medium text-neutral-700">動画バッジ（任意）</label>
+                    <select
+                      value={videoEditBadgeSelect}
+                      onChange={(e) => setVideoEditBadgeSelect(e.target.value)}
+                      className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                    >
+                      <option value="">未設定（非表示）</option>
+                      {videoBadgeOptions.map((label) => (
+                        <option key={`edit-video-${label}`} value={label}>{label}</option>
+                      ))}
+                      <option value="__new__">＋新規作成</option>
+                    </select>
+                    {videoEditBadgeSelect === "__new__" && (
+                      <input
+                        type="text"
+                        value={videoEditBadgeNewLabel}
+                        onChange={(e) => setVideoEditBadgeNewLabel(e.target.value)}
+                        placeholder="新しいバッジ名"
+                        className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                      />
+                    )}
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="text-[11px] text-neutral-600">
+                        背景色
+                        <input type="color" value={videoEditBadgeBg} onChange={(e) => setVideoEditBadgeBg(e.target.value)} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                      </label>
+                      <label className="text-[11px] text-neutral-600">
+                        文字色
+                        <input type="color" value={videoEditBadgeText} onChange={(e) => setVideoEditBadgeText(e.target.value)} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">コンテンツ階層</label>
+                    <select value={videoEditForm.content_tier} onChange={(e) => setVideoEditForm((f) => ({ ...f, content_tier: e.target.value as ContentTier }))} className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900">
+                      {(Object.keys(CONTENT_TIER_LABELS) as ContentTier[]).map((v) => (<option key={v} value={v}>{CONTENT_TIER_LABELS[v]}</option>))}
+                    </select>
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-medium text-neutral-600">関連スライド（複数選択）</p>
+                    <div className="max-h-44 space-y-1 overflow-y-auto rounded border border-neutral-300 bg-white p-2">
+                      {slides.map((s) => {
+                        const numericId = Number(s.id);
+                        const checked = videoEditSlideIds.includes(numericId);
+                        return (
+                          <label key={`edit-${s.id}`} className="flex items-center gap-2 text-xs text-neutral-700">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                if (!Number.isFinite(numericId)) return;
+                                if (e.target.checked) setVideoEditSlideIds((prev) => [...prev, numericId]);
+                                else setVideoEditSlideIds((prev) => prev.filter((id) => id !== numericId));
+                              }}
+                            />
+                            <span className="truncate">{s.title}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input id="video_edit_is_published" type="checkbox" checked={videoEditForm.is_published} onChange={(e) => setVideoEditForm((f) => ({ ...f, is_published: e.target.checked }))} className="h-4 w-4 rounded border-neutral-300" />
+                    <label htmlFor="video_edit_is_published" className="text-xs font-medium text-neutral-600">公開する</label>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setEditingVideo(null)} className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50" disabled={savingVideo}>キャンセル</button>
+                    <button type="submit" disabled={savingVideo} className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">{savingVideo ? "保存中..." : "保存"}</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </section>
+
         {/* 新規スライド作成（完全自動） */}
-        <section className="mb-12 rounded-lg border border-neutral-200 bg-white p-6">
+        <section className={`mb-12 rounded-lg border border-neutral-200 bg-white p-6 ${adminView === "slides" ? "" : "hidden"}`}>
           <h2 className="mb-4 text-lg font-semibold text-neutral-800">
             新規スライド作成
           </h2>
@@ -2192,8 +3859,32 @@ export default function AdminPage() {
                 name="pdf"
                 accept=".pdf,application/pdf"
                 required
+                onChange={(e) => setSelectedPdfName(e.target.files?.[0]?.name ?? "")}
                 className="block w-full text-sm text-neutral-600 file:mr-4 file:rounded file:border-0 file:bg-neutral-900 file:px-4 file:py-2 file:text-sm file:text-white file:hover:bg-neutral-800"
               />
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsPdfDragOver(true);
+                }}
+                onDragLeave={() => setIsPdfDragOver(false)}
+                onDrop={handlePdfDrop}
+                onPaste={handlePdfPaste}
+                tabIndex={0}
+                className="mt-2 rounded-lg border border-dashed px-3 py-3 text-xs outline-none"
+                style={{
+                  borderColor: isPdfDragOver ? "var(--accent)" : "var(--border)",
+                  background: isPdfDragOver ? "color-mix(in srgb, var(--accent) 8%, white)" : "transparent",
+                  color: "var(--fg-muted)",
+                }}
+              >
+                PDFをここにドラッグ&ドロップ、または貼り付け（Ctrl/Cmd + V）できます。
+                {selectedPdfName && (
+                  <div className="mt-1 text-[11px]" style={{ color: "var(--fg)" }}>
+                    選択中: {selectedPdfName}
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-neutral-700">
@@ -2216,9 +3907,7 @@ export default function AdminPage() {
               </label>
               <select
                 value={createForm.program_id}
-                onChange={(e) =>
-                  setCreateForm((f) => ({ ...f, program_id: e.target.value }))
-                }
+                onChange={(e) => handleProgramChangedForSlide(e.target.value)}
                 required
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
               >
@@ -2230,6 +3919,39 @@ export default function AdminPage() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="space-y-2 rounded-lg border border-neutral-200 bg-white p-3">
+              <label className="block text-sm font-medium text-neutral-700">スライドバッジ（任意）</label>
+              <select
+                value={slideBadgeSelect}
+                onChange={(e) => setSlideBadgeSelect(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+              >
+                <option value="">未設定（非表示）</option>
+                {slideBadgeOptions.map((label) => (
+                  <option key={label} value={label}>{label}</option>
+                ))}
+                <option value="__new__">＋新規作成</option>
+              </select>
+              {slideBadgeSelect === "__new__" && (
+                <input
+                  type="text"
+                  value={slideBadgeNewLabel}
+                  onChange={(e) => setSlideBadgeNewLabel(e.target.value)}
+                  placeholder="新しいバッジ名"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+                />
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-neutral-600">
+                  背景色
+                  <input type="color" value={slideBadgeBg} onChange={(e) => setSlideBadgeBg(e.target.value)} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                </label>
+                <label className="text-xs text-neutral-600">
+                  文字色
+                  <input type="color" value={slideBadgeText} onChange={(e) => setSlideBadgeText(e.target.value)} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                </label>
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-neutral-700">
@@ -2349,7 +4071,7 @@ export default function AdminPage() {
           </form>
         </section>
 
-        <section>
+        <section className={adminView === "slides" ? "" : "hidden"}>
           <h2 className="mb-4 text-lg font-semibold text-neutral-800">
             既存スライドの PDF → 画像変換
           </h2>
@@ -2474,14 +4196,14 @@ export default function AdminPage() {
         {/* 編集モーダル */}
         {editingSlide && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
             onClick={() => !saving && setEditingSlide(null)}
             role="dialog"
             aria-modal="true"
             aria-labelledby="edit-modal-title"
           >
             <div
-              className="w-full max-w-md rounded-lg border border-neutral-200 bg-white p-6 shadow-lg"
+              className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg border border-neutral-200 bg-white p-6 shadow-lg"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 id="edit-modal-title" className="mb-4 text-lg font-semibold text-neutral-800">
@@ -2508,9 +4230,7 @@ export default function AdminPage() {
                   </label>
                   <select
                     value={editForm.program_id}
-                    onChange={(e) =>
-                      setEditForm((f) => ({ ...f, program_id: e.target.value }))
-                    }
+                    onChange={(e) => handleProgramChangedForSlideEdit(e.target.value)}
                     required
                     className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
                   >
@@ -2522,6 +4242,39 @@ export default function AdminPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="space-y-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+                  <label className="block text-sm font-medium text-neutral-700">スライドバッジ（任意）</label>
+                  <select
+                    value={slideEditBadgeSelect}
+                    onChange={(e) => setSlideEditBadgeSelect(e.target.value)}
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+                  >
+                    <option value="">未設定（非表示）</option>
+                    {slideBadgeOptions.map((label) => (
+                      <option key={`edit-slide-${label}`} value={label}>{label}</option>
+                    ))}
+                    <option value="__new__">＋新規作成</option>
+                  </select>
+                  {slideEditBadgeSelect === "__new__" && (
+                    <input
+                      type="text"
+                      value={slideEditBadgeNewLabel}
+                      onChange={(e) => setSlideEditBadgeNewLabel(e.target.value)}
+                      placeholder="新しいバッジ名"
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+                    />
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-xs text-neutral-600">
+                      背景色
+                      <input type="color" value={slideEditBadgeBg} onChange={(e) => setSlideEditBadgeBg(e.target.value)} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                    </label>
+                    <label className="text-xs text-neutral-600">
+                      文字色
+                      <input type="color" value={slideEditBadgeText} onChange={(e) => setSlideEditBadgeText(e.target.value)} className="mt-1 h-9 w-full rounded border border-neutral-300 p-1" />
+                    </label>
+                  </div>
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-neutral-700">

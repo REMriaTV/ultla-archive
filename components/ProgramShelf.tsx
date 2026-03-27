@@ -19,17 +19,36 @@ function usePrefersNoHover(): boolean {
   return value;
 }
 
-/** プログラム名・slug から種別ラベルとバッジ用クラスを返す */
-function getProgramType(program: Program): { label: string; className: string } {
-  const s = `${program.name} ${program.slug}`.toLowerCase();
-  if (s.includes("abl")) return { label: "ABL", className: "bg-emerald-600 text-white" };
-  if (s.includes("pbl")) return { label: "PBL", className: "bg-blue-600 text-white" };
-  return { label: "プレゼン", className: "bg-amber-500 text-white" };
+function getProgramBadge(program: Program, kind: "slide" | "video"): { label: string; style: { backgroundColor: string; color: string } } | null {
+  const label = (kind === "slide" ? program.slide_badge_label : program.video_badge_label)?.trim() ?? "";
+  if (!label) return null;
+  const bg = (kind === "slide" ? program.slide_badge_bg : program.video_badge_bg) || "#f59e0b";
+  const text = (kind === "slide" ? program.slide_badge_text : program.video_badge_text) || "#ffffff";
+  return { label, style: { backgroundColor: bg, color: text } };
 }
 
 interface ProgramShelfProps {
   program: Program;
   slides: Slide[];
+}
+
+export interface VideoShelfItem {
+  id: string;
+  program_id: string;
+  title: string;
+  description?: string | null;
+  keyword_tags?: string[] | null;
+  youtube_url: string;
+  thumbnail_url?: string | null;
+}
+
+export interface CuratedShelfItem {
+  id: string;
+  type: "slide" | "video";
+  title: string;
+  href: string;
+  thumbnail_url?: string | null;
+  external?: boolean;
 }
 
 interface SlideThumbProps {
@@ -39,10 +58,17 @@ interface SlideThumbProps {
   onExpandSlide: (id: string) => void;
 }
 
+interface VideoThumbProps {
+  program: Program;
+  video: VideoShelfItem;
+  expandedVideoId: string | null;
+  onExpandVideo: (id: string) => void;
+}
+
 function SlideThumb({ program, slide, expandedSlideId, onExpandSlide }: SlideThumbProps) {
   const [isHovered, setIsHovered] = useState(false);
   const prefersNoHover = usePrefersNoHover();
-  const programType = getProgramType(program);
+  const badge = getProgramBadge(program, "slide");
   const thumb = slide.image_url ?? slide.page_image_urls?.[0];
   const caption = slide.caption?.trim() || null;
   const captionFallback =
@@ -162,14 +188,153 @@ function SlideThumb({ program, slide, expandedSlideId, onExpandSlide }: SlideThu
         }}
       >
         <div className="mb-1.5 flex items-center gap-2">
-          <span
-            className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-extrabold tracking-wide ${programType.className}`}
-          >
-            {programType.label}
-          </span>
+          {badge && (
+            <span
+              className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-extrabold tracking-wide"
+              style={badge.style}
+            >
+              {badge.label}
+            </span>
+          )}
           {slide.year != null && (
             <span className="text-[11px] font-medium" style={{ color: "var(--fg-muted)" }}>
               {slide.year}年
+            </span>
+          )}
+        </div>
+        {captionText && (
+          <p
+            className="line-clamp-2 text-[11.5px] leading-relaxed"
+            style={{ color: "var(--fg-muted)" }}
+          >
+            {captionText}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VideoThumb({ program, video, expandedVideoId, onExpandVideo }: VideoThumbProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const prefersNoHover = usePrefersNoHover();
+  const badge = getProgramBadge(program, "video");
+
+  const expandedByTap = expandedVideoId === video.id;
+  const showPanel = isHovered || expandedByTap;
+  const captionText = video.description?.trim() || (Array.isArray(video.keyword_tags) ? video.keyword_tags.slice(0, 3).join(" · ") : "");
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (prefersNoHover && !expandedByTap) {
+      e.preventDefault();
+      onExpandVideo(video.id);
+    }
+  };
+
+  return (
+    <div
+      className="relative shrink-0 snap-start program-shelf-thumb"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="relative" style={{ paddingBottom: "56.25%" }}>
+        <Link
+          href={`/video/${video.id}`}
+          onClick={handleClick}
+          className="absolute inset-0 overflow-hidden rounded-xl"
+          style={{
+            background: "var(--card-hover)",
+            transition: "transform 0.3s cubic-bezier(0.22,1,0.36,1), box-shadow 0.3s ease",
+            transform: showPanel ? "translateY(-10px) scale(1.02)" : "translateY(0) scale(1)",
+            boxShadow: showPanel
+              ? "0 16px 40px rgba(0,0,0,0.18), 0 4px 10px rgba(0,0,0,0.06)"
+              : "0 2px 8px rgba(0,0,0,0.08)",
+          }}
+        >
+          {video.thumbnail_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={video.thumbnail_url}
+              alt={video.title}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div
+              className="flex h-full w-full items-center justify-center"
+              style={{ background: "var(--card-hover)" }}
+            >
+              <span className="text-xs" style={{ color: "var(--fg-muted)" }}>
+                画像なし
+              </span>
+            </div>
+          )}
+
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ opacity: showPanel ? 1 : 0, transition: "opacity 0.3s ease" }}
+          >
+            <div
+              className="absolute inset-x-0 top-0"
+              style={{
+                height: "35%",
+                background: "linear-gradient(to bottom, rgba(0,0,0,0.35), transparent)",
+              }}
+            />
+            <div
+              className="absolute inset-x-0 bottom-0"
+              style={{
+                height: "55%",
+                background: "linear-gradient(to top, rgba(0,0,0,0.65), transparent)",
+              }}
+            />
+          </div>
+
+          <div
+            className="absolute inset-x-0 bottom-0 p-3"
+            style={{
+              opacity: showPanel ? 1 : 0,
+              transform: showPanel ? "translateY(0)" : "translateY(8px)",
+              transition: "all 0.3s ease 0.05s",
+            }}
+          >
+            <p
+              className="line-clamp-2 text-sm font-bold leading-tight text-white"
+              style={{ textShadow: "0 1px 6px rgba(0,0,0,0.5)" }}
+            >
+              {video.title}
+            </p>
+          </div>
+        </Link>
+      </div>
+
+      <div
+        className="relative z-10 overflow-hidden rounded-b-xl"
+        style={{
+          background: "var(--card)",
+          marginTop: -10,
+          maxHeight: showPanel ? 110 : 0,
+          paddingLeft: 12,
+          paddingRight: 12,
+          paddingTop: showPanel ? 10 : 0,
+          paddingBottom: showPanel ? 12 : 0,
+          opacity: showPanel ? 1 : 0,
+          transition: "all 0.3s cubic-bezier(0.22,1,0.36,1)",
+          boxShadow: showPanel ? "0 8px 20px rgba(0,0,0,0.1)" : "none",
+        }}
+      >
+        <div className="mb-1.5 flex items-center gap-2">
+          {badge && (
+            <span
+              className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-extrabold tracking-wide"
+              style={badge.style}
+            >
+              {badge.label}
+            </span>
+          )}
+          {Array.isArray(video.keyword_tags) && video.keyword_tags.length > 0 && (
+            <span className="line-clamp-1 text-[11px] font-medium" style={{ color: "var(--fg-muted)" }}>
+              {video.keyword_tags.slice(0, 2).join(" · ")}
             </span>
           )}
         </div>
@@ -381,6 +546,144 @@ export function ProgramShelf({ program, slides }: ProgramShelfProps) {
               expandedSlideId={expandedSlideId}
               onExpandSlide={setExpandedSlideId}
             />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function VideoSeriesShelf({ program, videos }: { program: Program; videos: VideoShelfItem[] }) {
+  const globalExpanded = useExpandedSlide();
+  const [localExpandedId, setLocalExpandedId] = useState<string | null>(null);
+  const expandedVideoId = globalExpanded?.expandedSlideId ?? localExpandedId;
+  const setExpandedVideoId = globalExpanded?.setExpandedSlideId ?? setLocalExpandedId;
+
+  if (videos.length === 0) return null;
+
+  return (
+    <section className="mb-0 md:mb-6">
+      <div className="mb-1 flex items-baseline justify-between gap-3 md:mb-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="mb-1 text-lg font-semibold md:text-xl" style={{ color: "var(--fg)" }}>
+            {program.name}（動画）
+          </h2>
+          <p className="line-clamp-1 text-sm md:text-xs" style={{ color: "var(--fg-muted)" }}>
+            動画シリーズ
+          </p>
+        </div>
+      </div>
+      <div style={{ overflow: "visible" }}>
+        <div
+          className="scrollbar-hide flex items-start gap-4 px-1 snap-x snap-mandatory"
+          style={{
+            overflowX: "auto",
+            overflowY: "hidden",
+            paddingBottom: 0,
+            minHeight: 120,
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          {videos.map((video) => (
+            <VideoThumb
+              key={video.id}
+              program={program}
+              video={video}
+              expandedVideoId={expandedVideoId}
+              onExpandVideo={setExpandedVideoId}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function CuratedShelf({
+  title,
+  description,
+  items,
+}: {
+  title: string;
+  description?: string | null;
+  items: CuratedShelfItem[];
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <section className="mb-8 scroll-mt-24 md:mb-10">
+      <div className="mb-1 flex items-baseline justify-between gap-3 md:mb-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="mb-1 text-lg font-semibold md:text-xl" style={{ color: "var(--fg)" }}>
+            {title}
+          </h2>
+          {description?.trim() && (
+            <p className="line-clamp-1 text-sm md:text-xs" style={{ color: "var(--fg-muted)" }}>
+              {description}
+            </p>
+          )}
+        </div>
+      </div>
+      <div style={{ overflow: "visible" }}>
+        <div
+          className="scrollbar-hide flex items-start gap-4 px-1 snap-x snap-mandatory"
+          style={{
+            overflowX: "auto",
+            overflowY: "hidden",
+            paddingBottom: 0,
+            minHeight: 120,
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          {items.map((item) => (
+            <a
+              key={item.id}
+              href={item.href}
+              target={item.external ? "_blank" : undefined}
+              rel={item.external ? "noreferrer" : undefined}
+              className="relative shrink-0 snap-start program-shelf-thumb overflow-hidden rounded-xl"
+              style={{
+                background: "var(--card-hover)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+              }}
+            >
+              <div className="relative" style={{ paddingBottom: "56.25%" }}>
+                {item.thumbnail_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.thumbnail_url}
+                    alt={item.title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div
+                    className="absolute inset-0 flex items-center justify-center"
+                    style={{ background: "var(--card-hover)" }}
+                  >
+                    <span className="text-xs" style={{ color: "var(--fg-muted)" }}>
+                      画像なし
+                    </span>
+                  </div>
+                )}
+                <div
+                  className="absolute inset-x-0 top-0 p-2"
+                  style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.45), transparent)" }}
+                >
+                  <span className="rounded-md bg-black/45 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white">
+                    {item.type === "video" ? "VIDEO" : "SLIDE"}
+                  </span>
+                </div>
+                <div
+                  className="absolute inset-x-0 bottom-0 p-3"
+                  style={{ background: "linear-gradient(to top, rgba(0,0,0,0.65), transparent)" }}
+                >
+                  <p className="line-clamp-2 text-sm font-bold leading-tight text-white">
+                    {item.title}
+                  </p>
+                </div>
+              </div>
+            </a>
           ))}
         </div>
       </div>

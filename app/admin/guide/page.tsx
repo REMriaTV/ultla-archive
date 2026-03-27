@@ -2,22 +2,35 @@ import Link from "next/link";
 
 export default function AdminGuidePage() {
   return (
-    <main className="mx-auto max-w-3xl px-6 py-8 space-y-8" style={{ color: "var(--fg)" }}>
+    <div className="min-h-screen w-full" style={{ background: "var(--bg)", color: "var(--fg)" }}>
+      <header className="w-full border-b" style={{ borderColor: "var(--border)", background: "var(--bg-header)" }}>
+        <div className="mx-auto w-full max-w-4xl px-6 py-6">
+          <div className="flex items-center justify-between gap-4">
+            <Link href="/admin" className="shrink-0 text-sm font-medium hover:opacity-80" style={{ color: "var(--fg-muted)" }}>
+              ← 管理画面
+            </Link>
+            <div className="flex min-w-0 shrink-0 items-center gap-4">
+              <Link href="/admin/operations" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>運用管理</Link>
+              <Link href="/admin/slides" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>スライド管理</Link>
+              <Link href="/admin/videos" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>動画管理</Link>
+              <Link href="/admin/settings" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>フロント設定</Link>
+              <Link href="/admin/master" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>マスタ管理</Link>
+              <h1 className="shrink-0 text-xl font-bold" style={{ color: "var(--fg)" }}>
+                使い方ガイド
+              </h1>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-4xl px-6 py-8 space-y-8" style={{ color: "var(--fg)" }}>
       <header className="space-y-2">
-        <h1 className="text-2xl font-bold" style={{ color: "var(--fg)" }}>
+        <h2 className="text-2xl font-bold" style={{ color: "var(--fg)" }}>
           SPACE ARCHIVE 管理者ガイド
-        </h1>
+        </h2>
         <p className="text-sm" style={{ color: "var(--fg-muted)" }}>
           このページは、スライドの公開レベルと招待コードの動き方を管理者目線で整理したメモです。
         </p>
-        <Link
-          href="/admin"
-          className="inline-flex items-center gap-1 text-sm transition-colors hover:opacity-80"
-          style={{ color: "var(--fg-muted)" }}
-        >
-          <span aria-hidden>←</span>
-          管理画面に戻る
-        </Link>
       </header>
 
       <section className="space-y-2">
@@ -171,7 +184,8 @@ export default function AdminGuidePage() {
           <li>管理者でないユーザーが /admin 以下にアクセスすると 404 になります。</li>
         </ul>
       </section>
-    </main>
+      </main>
+    </div>
   );
 }
 

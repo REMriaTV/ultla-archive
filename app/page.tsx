@@ -5,7 +5,7 @@ import { ExpandedSlideProvider } from "@/components/ExpandedSlideContext";
 import { AnnouncementCardWhenLoggedIn } from "@/components/AnnouncementCardWhenLoggedIn";
 import { GuestBanner } from "@/components/GuestBanner";
 import { HeroSlides } from "@/components/HeroSlides";
-import { InviteSeriesShelf, MylistShelf, ProgramShelf } from "@/components/ProgramShelf";
+import { CuratedShelf, InviteSeriesShelf, MylistShelf, ProgramShelf, VideoSeriesShelf, type CuratedShelfItem, type VideoShelfItem } from "@/components/ProgramShelf";
 import { SearchSection } from "@/components/SearchSection";
 import { getAccessContext, filterVisibleSlides } from "@/lib/access";
 import type { Slide } from "@/lib/types";
@@ -38,6 +38,10 @@ export default async function Home(props: HomeProps) {
   const [
     { data: programs, error: programsError },
     { data: allSlides, error: slidesError },
+    { data: allVideos, error: videosError },
+    { data: frontShelfOrderData, error: frontShelfOrderError },
+    { data: shelvesData, error: shelvesError },
+    { data: shelfItemsData, error: shelfItemsError },
     { data: siteSettings },
     { data: latestAnnouncement },
   ] = await Promise.all([
@@ -48,6 +52,23 @@ export default async function Home(props: HomeProps) {
     accessCtx.isAdmin && supabaseAdmin
       ? supabaseAdmin.from("slides").select("*")
       : supabase.from("slides").select("*"),
+    accessCtx.isAdmin && supabaseAdmin
+      ? supabaseAdmin.from("videos").select("*")
+      : supabase.from("videos").select("*"),
+    supabase
+      .from("front_shelf_order")
+      .select("shelf_type, ref_id, sort_order, is_enabled")
+      .eq("is_enabled", true)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("shelves")
+      .select("id, title, slug, description, sort_order, is_published")
+      .eq("is_published", true)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("shelf_items")
+      .select("id, shelf_id, content_type, content_id, sort_order")
+      .order("sort_order", { ascending: true }),
     supabase.from("site_settings").select("subtitle, hero_mode, hero_slide_count, hero_slide_ids").eq("id", "main").single(),
     supabase
       .from("announcements")
@@ -73,6 +94,10 @@ export default async function Home(props: HomeProps) {
 
   if (programsError) console.error("Programs fetch error:", programsError);
   if (slidesError) console.error("Slides fetch error:", slidesError);
+  if (videosError) console.error("Videos fetch error:", videosError);
+  if (frontShelfOrderError) console.error("Front shelf order fetch error:", frontShelfOrderError);
+  if (shelvesError) console.error("Shelves fetch error:", shelvesError);
+  if (shelfItemsError) console.error("Shelf items fetch error:", shelfItemsError);
 
   const allPrograms = programs ?? [];
   const programList = allPrograms.filter(
@@ -93,6 +118,141 @@ export default async function Home(props: HomeProps) {
     list.push(slide);
     slidesByProgram.set(slide.program_id, list);
   }
+
+  const rawVideos = (allVideos ?? []) as Array<{
+    id: string;
+    program_id: string | number;
+    title: string;
+    description?: string | null;
+    keyword_tags?: string[] | null;
+    youtube_url: string;
+    thumbnail_url: string | null;
+    visibility?: "free" | "invite_only" | "private" | null;
+    content_tier?: "basic" | "pro" | "advance" | null;
+    is_published?: boolean | null;
+  }>;
+
+  const visibleVideos = rawVideos.filter((video) => {
+    if (video.is_published === false) return false;
+    if (accessCtx.isAdmin) return true;
+    const vis = video.visibility ?? "free";
+    if (vis === "private") return false;
+    const tier = video.content_tier ?? "basic";
+    if (accessCtx.plan === "advance" || accessCtx.plan === "premium") return true;
+    if (accessCtx.plan === "pro" && (tier === "basic" || tier === "pro")) return vis !== "invite_only" || (accessCtx.accessibleSlideIds !== null && accessCtx.accessibleSlideIds.size > 0);
+    if (accessCtx.plan === "basic") return tier === "basic" && (vis === "free" || (vis === "invite_only" && accessCtx.accessibleSlideIds !== null && accessCtx.accessibleSlideIds.size > 0));
+    return vis === "free" && tier === "basic";
+  });
+
+  const videosByProgram = new Map<string, VideoShelfItem[]>();
+  const visibleVideosById = new Map<string, (typeof rawVideos)[number]>();
+  for (const video of visibleVideos) {
+    const pid = String(video.program_id);
+    visibleVideosById.set(String(video.id), video);
+    const list = videosByProgram.get(pid) ?? [];
+    list.push({
+      id: String(video.id),
+      program_id: pid,
+      title: video.title,
+      description: video.description ?? null,
+      keyword_tags: Array.isArray(video.keyword_tags) ? video.keyword_tags : [],
+      youtube_url: video.youtube_url,
+      thumbnail_url: video.thumbnail_url ?? null,
+    });
+    videosByProgram.set(pid, list);
+  }
+
+  const shelfRows = (shelvesData ?? []) as Array<{
+    id: string;
+    title: string;
+    slug: string;
+    description: string | null;
+    sort_order: number;
+    is_published: boolean;
+  }>;
+  const shelfItemRows = (shelfItemsData ?? []) as Array<{
+    id: string;
+    shelf_id: string;
+    content_type: "slide" | "video";
+    content_id: string;
+    sort_order: number;
+  }>;
+  const shelfItemsByShelf = new Map<string, typeof shelfItemRows>();
+  for (const row of shelfItemRows) {
+    const list = shelfItemsByShelf.get(row.shelf_id) ?? [];
+    list.push(row);
+    shelfItemsByShelf.set(row.shelf_id, list);
+  }
+  const curatedShelves = shelfRows
+    .map((shelf) => {
+      const items = (shelfItemsByShelf.get(shelf.id) ?? [])
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((item): CuratedShelfItem | null => {
+          if (item.content_type === "slide") {
+            const slide = slidesById.get(String(item.content_id));
+            if (!slide) return null;
+            return {
+              id: `${shelf.id}-slide-${slide.id}`,
+              type: "slide",
+              title: slide.title,
+              href: `/slide/${slide.id}`,
+              thumbnail_url: slide.image_url ?? slide.page_image_urls?.[0] ?? null,
+              external: false,
+            };
+          }
+          const video = visibleVideosById.get(String(item.content_id));
+          if (!video) return null;
+          return {
+            id: `${shelf.id}-video-${video.id}`,
+            type: "video",
+            title: video.title,
+            href: `/video/${video.id}`,
+            thumbnail_url: video.thumbnail_url ?? null,
+            external: false,
+          };
+        })
+        .filter(Boolean) as CuratedShelfItem[];
+      return {
+        id: shelf.id,
+        title: shelf.title,
+        description: shelf.description,
+        items,
+      };
+    })
+    .filter((s) => s.items.length > 0);
+
+  type FrontShelfOrderRow = {
+    shelf_type: "program_shelf" | "video_program_shelf" | "curated_shelf";
+    ref_id: string;
+    sort_order: number;
+    is_enabled: boolean;
+  };
+  const orderRows = (frontShelfOrderData ?? []) as FrontShelfOrderRow[];
+  const curatedById = new Map(curatedShelves.map((s) => [s.id, s]));
+  const programById = new Map(programList.map((p) => [String(p.id), p]));
+  const orderedFrontShelves = orderRows
+    .map((row) => {
+      if (row.shelf_type === "video_program_shelf") return { key: "video_program" as const, programId: String(row.ref_id) };
+      if (row.shelf_type === "program_shelf") return { key: "program" as const, programId: String(row.ref_id) };
+      const curated = curatedById.get(String(row.ref_id));
+      if (!curated) return null;
+      return { key: "curated" as const, curated };
+    })
+    .filter(Boolean) as Array<
+      | { key: "video_program"; programId: string }
+      | { key: "program"; programId: string }
+      | { key: "curated"; curated: (typeof curatedShelves)[number] }
+    >;
+
+  const fallbackFrontShelves: typeof orderedFrontShelves = [];
+  for (const program of programList) {
+    fallbackFrontShelves.push({ key: "program", programId: String(program.id) });
+    fallbackFrontShelves.push({ key: "video_program", programId: String(program.id) });
+  }
+  for (const curated of curatedShelves) {
+    fallbackFrontShelves.push({ key: "curated", curated });
+  }
+  const frontShelvesToRender = orderedFrontShelves.length > 0 ? orderedFrontShelves : fallbackFrontShelves;
 
   /** マイリスト：ログイン中のユーザーが保存したスライド（表示可能なもののみ・登録順） */
   let mylistSlides: Slide[] = [];
@@ -232,23 +392,54 @@ export default async function Home(props: HomeProps) {
                 すべてのシリーズ
               </h3>
             )}
-            {programList.length === 0 ? (
+
+            {frontShelvesToRender.length === 0 ? (
               <p className="py-8 text-center" style={{ color: "var(--fg-muted)" }}>
                 プログラムデータがありません
               </p>
             ) : (
-              programList.map((program) => (
-                <div
-                  key={program.id}
-                  id={`program-${program.id}`}
-                  className="scroll-mt-24"
-                >
-                  <ProgramShelf
-                    program={program}
-                    slides={slidesByProgram.get(program.id) ?? []}
-                  />
-                </div>
-              ))
+              frontShelvesToRender.map((row, idx) => {
+                if (row.key === "curated") {
+                  return (
+                    <CuratedShelf
+                      key={`curated-${row.curated.id}-${idx}`}
+                      title={row.curated.title}
+                      description={row.curated.description}
+                      items={row.curated.items}
+                    />
+                  );
+                }
+                if (row.key === "video_program") {
+                  const program = programById.get(row.programId);
+                  if (!program) return null;
+                  const videos = videosByProgram.get(row.programId) ?? [];
+                  if (videos.length === 0) return null;
+                  return (
+                    <VideoSeriesShelf
+                      key={`video-program-${row.programId}-${idx}`}
+                      program={program}
+                      videos={videos}
+                    />
+                  );
+                }
+                if (row.key === "program") {
+                  const program = programById.get(row.programId);
+                  if (!program) return null;
+                  return (
+                    <div
+                      key={`program-${row.programId}-${idx}`}
+                      id={`program-${program.id}`}
+                      className="scroll-mt-24"
+                    >
+                      <ProgramShelf
+                        program={program}
+                        slides={slidesByProgram.get(program.id) ?? []}
+                      />
+                    </div>
+                  );
+                }
+                return null;
+              })
             )}
           </section>
         </ExpandedSlideProvider>

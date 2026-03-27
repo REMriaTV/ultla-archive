@@ -31,19 +31,26 @@ export default async function AdminBusinessGuidePage() {
     content = await readFile(filePath, "utf-8");
   } catch {
     return (
-      <div className="min-h-screen bg-white px-6 py-8">
-        <div className="mx-auto max-w-3xl">
-          <header className="border-b border-neutral-200 pb-4">
-            <Link href="/admin" className="text-sm text-neutral-500 hover:underline">
-              ← 管理画面
-            </Link>
-            <h1 className="mt-2 text-xl font-bold text-neutral-800">
-              ビジネス・戦略ガイド（社外非公開）
-            </h1>
-          </header>
-          <p className="mt-6 text-neutral-600">
-            ドキュメントを読み込めませんでした。ファイルが存在するか確認してください。
-          </p>
+      <div className="min-h-screen w-full" style={{ background: "var(--bg)", color: "var(--fg)" }}>
+        <header className="w-full border-b" style={{ borderColor: "var(--border)", background: "var(--bg-header)" }}>
+          <div className="mx-auto w-full max-w-4xl px-6 py-6">
+            <div className="flex items-center justify-between gap-4">
+              <Link href="/admin" className="shrink-0 text-sm font-medium hover:opacity-80" style={{ color: "var(--fg-muted)" }}>
+                ← 管理画面
+              </Link>
+              <div className="flex min-w-0 shrink-0 items-center gap-4">
+                <Link href="/admin/operations" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>運用管理</Link>
+                <Link href="/admin/slides" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>スライド管理</Link>
+                <Link href="/admin/videos" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>動画管理</Link>
+                <Link href="/admin/settings" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>フロント設定</Link>
+                <Link href="/admin/master" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>マスタ管理</Link>
+                <h1 className="shrink-0 text-xl font-bold" style={{ color: "var(--fg)" }}>ビジネス・戦略ガイド</h1>
+              </div>
+            </div>
+          </div>
+        </header>
+        <div className="mx-auto max-w-4xl px-6 py-8">
+          <p style={{ color: "var(--fg-muted)" }}>ドキュメントを読み込めませんでした。ファイルが存在するか確認してください。</p>
         </div>
       </div>
     );
@@ -51,21 +58,30 @@ export default async function AdminBusinessGuidePage() {
 
   const blocks = content.split(/\n\n+/);
   return (
-    <div className="min-h-screen bg-white px-6 py-8">
-      <div className="mx-auto max-w-3xl">
-        <header className="border-b border-neutral-200 pb-4">
-          <Link href="/admin" className="text-sm text-neutral-500 hover:underline">
-            ← 管理画面
-          </Link>
-          <h1 className="mt-2 text-xl font-bold text-neutral-800">
-            ビジネス・戦略ガイド（社外非公開）
-          </h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            運営チーム共有用。いつでも参照して方針を揃えてください。
-          </p>
-        </header>
+    <div className="min-h-screen w-full" style={{ background: "var(--bg)", color: "var(--fg)" }}>
+      <header className="w-full border-b" style={{ borderColor: "var(--border)", background: "var(--bg-header)" }}>
+        <div className="mx-auto w-full max-w-4xl px-6 py-6">
+          <div className="flex items-center justify-between gap-4">
+            <Link href="/admin" className="shrink-0 text-sm font-medium hover:opacity-80" style={{ color: "var(--fg-muted)" }}>
+              ← 管理画面
+            </Link>
+            <div className="flex min-w-0 shrink-0 items-center gap-4">
+              <Link href="/admin/operations" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>運用管理</Link>
+              <Link href="/admin/slides" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>スライド管理</Link>
+              <Link href="/admin/videos" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>動画管理</Link>
+              <Link href="/admin/settings" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>フロント設定</Link>
+              <Link href="/admin/master" className="shrink-0 text-sm hover:opacity-80" style={{ color: "var(--fg-muted)" }}>マスタ管理</Link>
+              <h1 className="shrink-0 text-xl font-bold" style={{ color: "var(--fg)" }}>ビジネス・戦略ガイド</h1>
+            </div>
+          </div>
+        </div>
+      </header>
 
-        <article className="mt-8 space-y-6">
+      <div className="mx-auto max-w-4xl px-6 py-8">
+        <p className="mb-6 text-sm" style={{ color: "var(--fg-muted)" }}>
+          運営チーム共有用。いつでも参照して方針を揃えてください。
+        </p>
+        <article className="space-y-6 rounded-lg border p-6" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
           {blocks.map((block, i) => {
             const trimmed = block.trim();
             if (!trimmed) return null;
