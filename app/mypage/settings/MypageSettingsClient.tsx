@@ -70,22 +70,19 @@ export function MypageSettingsClient() {
   }, [logoutToast]);
 
   return (
-    <div
-      className="flex flex-col gap-8 rounded-xl border p-5"
-      style={{
-        borderColor: "var(--border)",
-        background: "var(--card)",
-      }}
-    >
-      <section>
+    <>
+      <section
+        className="border-t px-5 py-5 sm:px-6 sm:py-6"
+        style={{ borderColor: "var(--border)" }}
+      >
         <h2
-          className="mb-3 text-sm font-semibold"
-          style={{ color: "var(--fg)" }}
+          className="mb-1 text-sm font-medium"
+          style={{ color: "var(--fg-muted)" }}
         >
-          テーマ
+          表示テーマ
         </h2>
         <p
-          className="mb-3 text-xs"
+          className="mb-4 text-sm leading-relaxed"
           style={{ color: "var(--fg-muted)" }}
         >
           選択したテーマは保存され、次回以降も適用されます。
@@ -107,8 +104,9 @@ export function MypageSettingsClient() {
                         color: "var(--btn-primary-fg)",
                       }
                     : {
-                        background: "var(--card-hover)",
+                        background: "var(--bg-header)",
                         color: "var(--fg)",
+                        border: "1px solid var(--border)",
                       }
                 }
               >
@@ -119,20 +117,21 @@ export function MypageSettingsClient() {
         </div>
       </section>
 
-      <section>
-        <h2
-          className="mb-3 text-sm font-semibold"
-          style={{ color: "var(--fg)" }}
-        >
+      <section
+        className="flex flex-col gap-3 border-t px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+        style={{ borderColor: "var(--border)" }}
+      >
+        <span className="text-sm font-medium" style={{ color: "var(--fg-muted)" }}>
           ログアウト
-        </h2>
+        </span>
         <button
           type="button"
           onClick={handleLogout}
-          className="rounded-lg border px-4 py-2 text-sm font-medium"
+          className="shrink-0 self-start rounded-lg border px-4 py-2.5 text-sm font-medium transition-opacity hover:opacity-90 sm:self-auto"
           style={{
             borderColor: "var(--border)",
             color: "var(--fg)",
+            background: "transparent",
           }}
         >
           ログアウトする
@@ -153,6 +152,6 @@ export function MypageSettingsClient() {
           ログアウトしました
         </div>
       )}
-    </div>
+    </>
   );
 }

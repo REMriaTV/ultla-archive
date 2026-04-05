@@ -81,18 +81,18 @@ export function SlideImageViewer({
                 >
                   <p className="mb-4 max-w-sm text-center text-sm font-medium text-neutral-900 drop-shadow-sm">
                     {isLoggedIn
-                      ? `このスライドの全${pageCount}ページを閲覧するには、マイページの「招待コード」からコードを入力してください。招待コードには有効期限があります。`
-                      : `このスライドの全${pageCount}ページを閲覧するにはログインが必要です。ログイン後、招待コードを入力すると全ページ閲覧できます。`}
+                      ? `このスライドの全${pageCount}ページを閲覧するには、マイページの「アカウント」で閲覧範囲をご確認ください。`
+                      : `このスライドの全${pageCount}ページを閲覧するにはログインが必要です。`}
                   </p>
                   <Link
-                    href={isLoggedIn ? "/mypage/invite-codes" : "/login"}
+                    href={isLoggedIn ? "/mypage/settings" : "/login"}
                     className="rounded-lg px-6 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
                     style={{
                       background: "var(--btn-primary-bg)",
                       color: "var(--btn-primary-fg)",
                     }}
                   >
-                    {isLoggedIn ? "招待コードを入力" : "ログイン"}
+                    {isLoggedIn ? "マイページへ" : "ログイン"}
                   </Link>
                 </div>
               )}

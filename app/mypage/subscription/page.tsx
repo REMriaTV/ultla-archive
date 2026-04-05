@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { SHOW_PAID_PLAN_UI } from "@/lib/feature-flags";
 import { SubscriptionCheckoutButtons } from "./SubscriptionCheckoutButtons";
 
 const PLAN_LABELS: Record<string, string> = {
@@ -14,6 +16,10 @@ export default async function MypageSubscriptionPage({
 }: {
   searchParams: Promise<{ success?: string; canceled?: string }>;
 }) {
+  if (!SHOW_PAID_PLAN_UI) {
+    redirect("/mypage/settings");
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -97,11 +103,11 @@ export default async function MypageSubscriptionPage({
       </div>
 
       <Link
-        href="/mypage/invite-codes"
+        href="/mypage/settings"
         className="text-sm font-medium"
         style={{ color: "var(--accent)" }}
       >
-        ← 招待コードページに戻る
+        ← アカウントに戻る
       </Link>
     </div>
   );

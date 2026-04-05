@@ -151,6 +151,28 @@ export async function PATCH(
       updates.content_tier = body.content_tier;
     }
 
+    if (typeof body.thumbnail_page_index === "number" && Number.isFinite(body.thumbnail_page_index)) {
+      const { data: row, error: selErr } = await supabaseAdmin
+        .from("slides")
+        .select("page_image_urls")
+        .eq("id", id)
+        .single();
+      if (selErr) {
+        return NextResponse.json(
+          { error: "スライドの取得に失敗しました", details: selErr.message },
+          { status: 500 }
+        );
+      }
+      const urls = Array.isArray(row?.page_image_urls)
+        ? (row.page_image_urls as string[]).filter((u): u is string => typeof u === "string" && u.length > 0)
+        : [];
+      if (urls.length > 0) {
+        let idx = Math.floor(body.thumbnail_page_index) - 1;
+        idx = Math.max(0, Math.min(idx, urls.length - 1));
+        updates.image_url = urls[idx];
+      }
+    }
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(
         { error: "更新する項目がありません" },

@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-const SETTINGS_NAV = [
-  { label: "アカウント情報", href: "/mypage/account" },
-  { label: "マイリスト", href: "/mypage/mylist" },
-  { label: "招待コード", href: "/mypage/invite-codes" },
-  { label: "プラン登録", href: "/mypage/subscription" },
-  { label: "設定", href: "/mypage/settings" },
-  { label: "お問い合わせ", href: "/mypage/contact" },
+import { SHOW_PAID_PLAN_UI } from "@/lib/feature-flags";
+
+const SETTINGS_NAV_ALL = [
   { label: "お知らせ", href: "/mypage/announcements" },
+  { label: "アカウント", href: "/mypage/settings" },
+  { label: "マイリスト", href: "/mypage/mylist" },
+  { label: "お問い合わせ", href: "/mypage/contact" },
+  { label: "プラン登録", href: "/mypage/subscription" },
 ] as const;
 
 interface GenreTypeRow {
@@ -33,6 +33,9 @@ interface MobileSidebarProps {
 
 function MobileSidebar({ onClose }: MobileSidebarProps) {
   const pathname = usePathname();
+  const settingsNav = SETTINGS_NAV_ALL.filter(
+    (item) => SHOW_PAID_PLAN_UI || item.href !== "/mypage/subscription"
+  );
   const [programs, setPrograms] = useState<SidebarProgram[]>([]);
   const [genreTypes, setGenreTypes] = useState<GenreTypeRow[]>([]);
   const [openMypage, setOpenMypage] = useState(true);
@@ -161,7 +164,7 @@ function MobileSidebar({ onClose }: MobileSidebarProps) {
               className="mt-1 flex flex-col gap-0.5 border-l pl-3"
               style={{ borderColor: "var(--border)" }}
             >
-              {SETTINGS_NAV.map(({ label, href }) => (
+              {settingsNav.map(({ label, href }) => (
                 <Link
                   key={href}
                   href={href}

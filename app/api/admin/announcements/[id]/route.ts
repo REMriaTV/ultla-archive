@@ -44,12 +44,18 @@ export async function PATCH(
       updates.published_at = new Date().toISOString();
     }
   }
+  if (typeof body.show_on_home === "boolean") {
+    updates.show_on_home = body.show_on_home;
+  }
+  if (typeof body.home_sort_order === "number" && Number.isFinite(body.home_sort_order)) {
+    updates.home_sort_order = Math.floor(body.home_sort_order);
+  }
 
   const { data, error } = await supabaseAdmin
     .from("announcements")
     .update(updates)
     .eq("id", id)
-    .select("id, title, body, is_published, created_at, updated_at, published_at")
+    .select("id, title, body, is_published, created_at, updated_at, published_at, show_on_home, home_sort_order")
     .single();
 
   if (error) {

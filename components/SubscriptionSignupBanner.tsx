@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SHOW_PAID_PLAN_UI } from "@/lib/feature-flags";
 
 /**
  * 招待コード期限切れ時または有効なコードがないときに、
@@ -8,6 +9,7 @@ import Link from "next/link";
  * リンク先のサブスク登録画面は Phase 3 で作成予定。
  */
 export function SubscriptionSignupBanner() {
+  if (!SHOW_PAID_PLAN_UI) return null;
   return (
     <div
       className="rounded-xl border p-5"

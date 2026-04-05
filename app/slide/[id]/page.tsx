@@ -176,18 +176,18 @@ export default async function SlideDetailPage({ params }: SlideDetailPageProps) 
                   style={{ color: "var(--fg)" }}
                 >
                   {accessCtx.userId
-                    ? `最初の${freePreviewPageCount}ページは無料で閲覧できます。全ページを閲覧するには、マイページの「招待コード」からコードを入力してください。招待コードには有効期限があります。`
-                    : `最初の${freePreviewPageCount}ページは無料で閲覧できます。全ページを閲覧するにはログインのうえ、招待コードを入力してください。`}
+                    ? `最初の${freePreviewPageCount}ページは無料で閲覧できます。全ページを閲覧するには、マイページの「アカウント」で閲覧範囲をご確認ください。`
+                    : `最初の${freePreviewPageCount}ページは無料で閲覧できます。全ページを閲覧するにはログインしてください。`}
                 </p>
                 <Link
-                  href={accessCtx.userId ? "/mypage/invite-codes" : "/login"}
+                  href={accessCtx.userId ? "/mypage/settings" : "/login"}
                   className="rounded-lg px-6 py-3 text-sm font-medium transition-colors"
                   style={{
                     background: "var(--btn-primary-bg)",
                     color: "var(--btn-primary-fg)",
                   }}
                 >
-                  {accessCtx.userId ? "招待コードを入力" : "ログイン"}
+                  {accessCtx.userId ? "マイページへ" : "ログイン"}
                 </Link>
                 {isAdmin && (
                   <p className="mt-4 max-w-md text-center text-xs" style={{ color: "var(--fg-muted)" }}>

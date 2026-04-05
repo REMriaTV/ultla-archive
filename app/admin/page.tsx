@@ -36,11 +36,23 @@ interface SlideRow {
   pdf_url: string | null;
   page_count: number | null;
   page_image_urls: string[] | null;
+  image_url?: string | null;
   year: number | null;
   keyword_tags: string[];
   caption: string | null;
   visibility?: SlideVisibility;
   content_tier?: ContentTier | null;
+}
+
+function thumbPageIndexFromSlide(slide: SlideRow): number {
+  const urls = slide.page_image_urls ?? [];
+  if (urls.length === 0) return 1;
+  const img = slide.image_url;
+  if (img) {
+    const idx = urls.findIndex((u) => u === img);
+    if (idx >= 0) return idx + 1;
+  }
+  return 1;
 }
 
 interface GenreTypeRow {
@@ -82,6 +94,7 @@ export default function AdminPage() {
     caption: "",
     visibility: "private" as SlideVisibility,
     content_tier: "basic" as ContentTier,
+    thumbnail_page: "1",
   });
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -94,6 +107,7 @@ export default function AdminPage() {
     caption: "",
     visibility: "free" as SlideVisibility,
     content_tier: "basic" as ContentTier,
+    thumbnail_page: "1",
   });
   const [keywordTags, setKeywordTags] = useState<string[]>([]);
   const [slideBadgeSelect, setSlideBadgeSelect] = useState("");
@@ -187,12 +201,26 @@ export default function AdminPage() {
     created_at: string;
     updated_at: string;
     published_at: string;
+    show_on_home?: boolean;
+    home_sort_order?: number;
   }>>([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
   const [creatingAnnouncement, setCreatingAnnouncement] = useState(false);
-  const [announcementForm, setAnnouncementForm] = useState({ title: "", body: "", is_published: true });
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: "",
+    body: "",
+    is_published: true,
+    show_on_home: false,
+    home_sort_order: 0,
+  });
   const [editingAnnouncement, setEditingAnnouncement] = useState<typeof announcements[0] | null>(null);
-  const [announcementEditForm, setAnnouncementEditForm] = useState({ title: "", body: "", is_published: true });
+  const [announcementEditForm, setAnnouncementEditForm] = useState({
+    title: "",
+    body: "",
+    is_published: true,
+    show_on_home: false,
+    home_sort_order: 0,
+  });
   const [savingAnnouncement, setSavingAnnouncement] = useState(false);
   const [announcementBodyTab, setAnnouncementBodyTab] = useState<"edit" | "preview">("edit");
   const [announcementEditBodyTab, setAnnouncementEditBodyTab] = useState<"edit" | "preview">("edit");
@@ -797,6 +825,8 @@ export default function AdminPage() {
           title: announcementForm.title.trim(),
           body: announcementForm.body.trim(),
           is_published: announcementForm.is_published,
+          show_on_home: announcementForm.show_on_home,
+          home_sort_order: announcementForm.home_sort_order,
         }),
       });
       const data = await res.json();
@@ -806,7 +836,13 @@ export default function AdminPage() {
       }
       setAnnouncements((prev) => [data, ...prev]);
       setCreatingAnnouncement(false);
-      setAnnouncementForm({ title: "", body: "", is_published: true });
+      setAnnouncementForm({
+        title: "",
+        body: "",
+        is_published: true,
+        show_on_home: false,
+        home_sort_order: 0,
+      });
     } catch (err) {
       alert(err instanceof Error ? err.message : "お知らせの作成に失敗しました");
     } finally {
@@ -830,6 +866,8 @@ export default function AdminPage() {
           title: announcementEditForm.title.trim(),
           body: announcementEditForm.body.trim(),
           is_published: announcementEditForm.is_published,
+          show_on_home: announcementEditForm.show_on_home,
+          home_sort_order: announcementEditForm.home_sort_order,
         }),
       });
       const data = await res.json();
@@ -859,6 +897,27 @@ export default function AdminPage() {
       if (editingAnnouncement?.id === id) setEditingAnnouncement(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : "お知らせの削除に失敗しました");
+    }
+  }
+
+  async function patchAnnouncementFields(
+    id: string,
+    updates: { show_on_home?: boolean; home_sort_order?: number }
+  ) {
+    try {
+      const res = await fetch(`/api/admin/announcements/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "更新に失敗しました");
+        return;
+      }
+      setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, ...data } : a)));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "更新に失敗しました");
     }
   }
 
@@ -1346,7 +1405,7 @@ export default function AdminPage() {
   async function loadSlides() {
     const { data, error } = await supabase
       .from("slides")
-      .select("id, title, program_id, pdf_url, page_count, page_image_urls, year, keyword_tags, caption, visibility, content_tier")
+      .select("id, title, program_id, pdf_url, page_count, page_image_urls, image_url, year, keyword_tags, caption, visibility, content_tier")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -1378,6 +1437,7 @@ export default function AdminPage() {
       if (createForm.caption) formData.append("caption", createForm.caption);
       formData.append("visibility", createForm.visibility);
       formData.append("content_tier", createForm.content_tier);
+      formData.append("thumbnail_page", createForm.thumbnail_page.trim() || "1");
 
       const res = await fetch("/api/slides/create", {
         method: "POST",
@@ -1397,7 +1457,7 @@ export default function AdminPage() {
       }
 
       alert(`作成完了: ${json.pageCount}ページ`);
-      setCreateForm({ title: "", program_id: "", year: "", caption: "", visibility: "free", content_tier: "basic" });
+      setCreateForm({ title: "", program_id: "", year: "", caption: "", visibility: "free", content_tier: "basic", thumbnail_page: "1" });
       setKeywordTags([]);
       setSlideBadgeSelect("");
       setSlideBadgeNewLabel("");
@@ -1546,6 +1606,7 @@ export default function AdminPage() {
       caption: slide.caption ?? "",
       visibility: (slide.visibility as SlideVisibility) || "private",
       content_tier: (slide.content_tier as ContentTier) || "basic",
+      thumbnail_page: String(thumbPageIndexFromSlide(slide)),
     });
     const p = programs.find((row) => String(row.id) === String(slide.program_id));
     const label = p?.slide_badge_label?.trim() ?? "";
@@ -1565,18 +1626,27 @@ export default function AdminPage() {
         .split(/[,，\s]+/)
         .map((t) => t.trim())
         .filter(Boolean);
+      const patchBody: Record<string, unknown> = {
+        title: editForm.title,
+        program_id: editForm.program_id || null,
+        year: editForm.year ? Number(editForm.year) : null,
+        keyword_tags: tags,
+        caption: editForm.caption.trim() || null,
+        visibility: editForm.visibility,
+        content_tier: editForm.content_tier,
+      };
+      const pageCount = editingSlide.page_image_urls?.length ?? 0;
+      if (pageCount > 0) {
+        const tp = parseInt(editForm.thumbnail_page.trim(), 10);
+        if (!Number.isNaN(tp) && tp >= 1) {
+          patchBody.thumbnail_page_index = tp;
+        }
+      }
+
       const res = await fetch(`/api/slides/${editingSlide.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: editForm.title,
-          program_id: editForm.program_id || null,
-          year: editForm.year ? Number(editForm.year) : null,
-          keyword_tags: tags,
-          caption: editForm.caption.trim() || null,
-          visibility: editForm.visibility,
-          content_tier: editForm.content_tier,
-        }),
+        body: JSON.stringify(patchBody),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -3191,7 +3261,13 @@ export default function AdminPage() {
               type="button"
               onClick={() => {
                 setCreatingAnnouncement(true);
-                setAnnouncementForm({ title: "", body: "", is_published: true });
+                setAnnouncementForm({
+                  title: "",
+                  body: "",
+                  is_published: true,
+                  show_on_home: false,
+                  home_sort_order: 0,
+                });
               }}
               className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
             >
@@ -3199,7 +3275,7 @@ export default function AdminPage() {
             </button>
           </div>
           <p className="mb-4 text-sm text-neutral-600">
-            トップページ・ログインページ・マイページで表示するお知らせです。公開にすると published_at が更新され、最新1件がトップ・ログインに表示されます。
+            マイページのお知らせ一覧には、公開中のものが表示されます。トップページ（未ログイン含む）に載せるお知らせは、下の一覧で「トップ」をオンにしてください（複数可・表示順は数字が小さいほど上）。オフにするとトップには出ません。
           </p>
           {loadingAnnouncements ? (
             <p className="text-sm text-neutral-500">読み込み中...</p>
@@ -3209,6 +3285,8 @@ export default function AdminPage() {
                 <thead className="border-b border-neutral-200 bg-neutral-50">
                   <tr>
                     <th className="px-4 py-3 font-medium text-neutral-700">公開状態</th>
+                    <th className="w-20 px-2 py-3 text-center text-xs font-medium text-neutral-700">トップ</th>
+                    <th className="w-16 px-2 py-3 text-center text-xs font-medium text-neutral-700">順</th>
                     <th className="px-4 py-3 font-medium text-neutral-700">タイトル</th>
                     <th className="px-4 py-3 font-medium text-neutral-700">公開日</th>
                     <th className="px-4 py-3 font-medium text-neutral-700">更新日</th>
@@ -3229,6 +3307,31 @@ export default function AdminPage() {
                           {a.is_published ? "公開" : "下書き"}
                         </span>
                       </td>
+                      <td className="px-2 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          title={a.is_published ? "トップページに表示" : "公開中のみトップに出せます"}
+                          checked={a.show_on_home === true}
+                          disabled={!a.is_published}
+                          onChange={(e) => patchAnnouncementFields(a.id, { show_on_home: e.target.checked })}
+                          className="h-4 w-4 rounded border-neutral-300 disabled:opacity-40"
+                        />
+                      </td>
+                      <td className="px-2 py-3 text-center">
+                        <input
+                          type="number"
+                          title="表示順（小さいほど上）"
+                          className="w-14 rounded border border-neutral-300 px-1 py-1 text-center text-xs text-neutral-900"
+                          defaultValue={a.home_sort_order ?? 0}
+                          key={`${a.id}-${a.home_sort_order ?? 0}`}
+                          onBlur={(e) => {
+                            const v = parseInt(e.target.value, 10);
+                            if (!Number.isFinite(v)) return;
+                            if (v === (a.home_sort_order ?? 0)) return;
+                            patchAnnouncementFields(a.id, { home_sort_order: v });
+                          }}
+                        />
+                      </td>
                       <td className="max-w-[240px] truncate px-4 py-3 text-neutral-800" title={a.title}>
                         {a.title}
                       </td>
@@ -3248,6 +3351,8 @@ export default function AdminPage() {
                                 title: a.title,
                                 body: a.body,
                                 is_published: a.is_published,
+                                show_on_home: a.show_on_home === true,
+                                home_sort_order: typeof a.home_sort_order === "number" ? a.home_sort_order : 0,
                               });
                             }}
                             className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
@@ -3348,6 +3453,38 @@ export default function AdminPage() {
                   公開する
                 </label>
               </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="announcement_new_home"
+                    checked={announcementForm.show_on_home}
+                    disabled={!announcementForm.is_published}
+                    onChange={(e) => setAnnouncementForm((f) => ({ ...f, show_on_home: e.target.checked }))}
+                    className="h-4 w-4 rounded border-neutral-300 disabled:opacity-40"
+                  />
+                  <label htmlFor="announcement_new_home" className="text-xs font-medium text-neutral-600">
+                    トップページにも表示（公開中のみ）
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="announcement_new_order" className="text-xs font-medium text-neutral-600">
+                    トップでの順（小さいほど上）
+                  </label>
+                  <input
+                    id="announcement_new_order"
+                    type="number"
+                    value={announcementForm.home_sort_order}
+                    onChange={(e) =>
+                      setAnnouncementForm((f) => ({
+                        ...f,
+                        home_sort_order: parseInt(e.target.value, 10) || 0,
+                      }))
+                    }
+                    className="w-16 rounded border border-neutral-300 px-2 py-1 text-sm text-neutral-900"
+                  />
+                </div>
+              </div>
               <div className="flex gap-2">
                 <button
                   type="submit"
@@ -3360,7 +3497,13 @@ export default function AdminPage() {
                   type="button"
                   onClick={() => {
                     setCreatingAnnouncement(false);
-                    setAnnouncementForm({ title: "", body: "", is_published: true });
+                    setAnnouncementForm({
+                      title: "",
+                      body: "",
+                      is_published: true,
+                      show_on_home: false,
+                      home_sort_order: 0,
+                    });
                   }}
                   className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
                 >
@@ -3455,6 +3598,40 @@ export default function AdminPage() {
                     <label htmlFor="announcement_edit_published" className="text-sm font-medium text-neutral-600">
                       公開する（ON にすると published_at を現在時刻に更新）
                     </label>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="announcement_edit_home"
+                        checked={announcementEditForm.show_on_home}
+                        disabled={!announcementEditForm.is_published}
+                        onChange={(e) =>
+                          setAnnouncementEditForm((f) => ({ ...f, show_on_home: e.target.checked }))
+                        }
+                        className="h-4 w-4 rounded border-neutral-300 disabled:opacity-40"
+                      />
+                      <label htmlFor="announcement_edit_home" className="text-sm font-medium text-neutral-600">
+                        トップページに表示（公開中のみ）
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="announcement_edit_order" className="text-sm font-medium text-neutral-600">
+                        トップでの順
+                      </label>
+                      <input
+                        id="announcement_edit_order"
+                        type="number"
+                        value={announcementEditForm.home_sort_order}
+                        onChange={(e) =>
+                          setAnnouncementEditForm((f) => ({
+                            ...f,
+                            home_sort_order: parseInt(e.target.value, 10) || 0,
+                          }))
+                        }
+                        className="w-20 rounded border border-neutral-300 px-2 py-1 text-sm text-neutral-900"
+                      />
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -4183,6 +4360,23 @@ export default function AdminPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-neutral-700">
+                サムネイルに使うページ
+              </label>
+              <p className="mb-2 text-xs text-neutral-500">
+                PDFの何ページ目を一覧・棚のサムネイルにするか（1＝1ページ目）。アップロード後に編集から変更もできます。
+              </p>
+              <input
+                type="number"
+                min={1}
+                value={createForm.thumbnail_page}
+                onChange={(e) =>
+                  setCreateForm((f) => ({ ...f, thumbnail_page: e.target.value }))
+                }
+                className="w-full max-w-[12rem] rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-neutral-700">
                 公開レベル
               </label>
               <select
@@ -4536,6 +4730,26 @@ export default function AdminPage() {
                     ))}
                   </select>
                 </div>
+                {editingSlide.page_image_urls && editingSlide.page_image_urls.length > 0 && (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-neutral-700">
+                      サムネイルに使うページ
+                    </label>
+                    <p className="mb-2 text-xs text-neutral-500">
+                      全{editingSlide.page_image_urls.length}ページ中、何ページ目をサムネイルにするか（1＝1ページ目）。
+                    </p>
+                    <input
+                      type="number"
+                      min={1}
+                      max={editingSlide.page_image_urls.length}
+                      value={editForm.thumbnail_page}
+                      onChange={(e) =>
+                        setEditForm((f) => ({ ...f, thumbnail_page: e.target.value }))
+                      }
+                      className="w-full max-w-[12rem] rounded-lg border border-neutral-300 px-3 py-2 text-neutral-900"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-neutral-700">
                     キャプション

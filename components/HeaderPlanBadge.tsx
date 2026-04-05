@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { SHOW_PAID_PLAN_UI } from "@/lib/feature-flags";
 
 type Plan = "free" | "basic" | "pro" | "advance" | "premium";
 
@@ -56,6 +57,7 @@ export function HeaderPlanBadge() {
     };
   }, [isLoggedIn]);
 
+  if (!SHOW_PAID_PLAN_UI) return null;
   if (!mounted) return null;
 
   const label = !isLoggedIn

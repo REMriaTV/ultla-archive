@@ -55,6 +55,13 @@ export async function POST(request: Request) {
       ? contentTierStr
       : "basic";
 
+    const thumbPageStr = formData.get("thumbnail_page") as string | null;
+    let thumbnailPage1Based = 1;
+    if (thumbPageStr && thumbPageStr.trim()) {
+      const n = parseInt(thumbPageStr.trim(), 10);
+      if (!Number.isNaN(n) && n >= 1) thumbnailPage1Based = n;
+    }
+
     if (!file || !title?.trim() || !programId) {
       return NextResponse.json(
         { error: "PDF、タイトル、プログラムは必須です" },
@@ -179,13 +186,17 @@ export async function POST(request: Request) {
       pageIndex++;
     }
 
-    // 5. page_count, page_image_urls, image_url（サムネイル＝1枚目）を更新
+    // 5. page_count, page_image_urls, image_url（サムネイル＝指定ページ、既定は1枚目）
+    const thumbIdx = pageImageUrls.length > 0
+      ? Math.min(Math.max(0, thumbnailPage1Based - 1), pageImageUrls.length - 1)
+      : 0;
+    const thumbUrl = pageImageUrls.length > 0 ? pageImageUrls[thumbIdx] ?? null : null;
     await supabaseAdmin
       .from("slides")
       .update({
         page_count: pageImageUrls.length,
         page_image_urls: pageImageUrls,
-        image_url: pageImageUrls[0] ?? null,
+        image_url: thumbUrl,
       })
       .eq("id", slideId);
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ExpandedSlideProvider } from "@/components/ExpandedSlideContext";
-import { AnnouncementCardWhenLoggedIn } from "@/components/AnnouncementCardWhenLoggedIn";
+import { HomeAnnouncementCards } from "@/components/HomeAnnouncementCards";
 import { GuestBanner } from "@/components/GuestBanner";
 import { HeroSlides } from "@/components/HeroSlides";
 import { CuratedShelf, InviteSeriesShelf, MylistShelf, ProgramShelf, VideoSeriesShelf, type CuratedShelfItem, type VideoShelfItem } from "@/components/ProgramShelf";
@@ -43,7 +43,7 @@ export default async function Home(props: HomeProps) {
     { data: shelvesData, error: shelvesError },
     { data: shelfItemsData, error: shelfItemsError },
     { data: siteSettings },
-    { data: latestAnnouncement },
+    { data: homeAnnouncementsData },
   ] = await Promise.all([
     supabase
       .from("programs")
@@ -74,9 +74,9 @@ export default async function Home(props: HomeProps) {
       .from("announcements")
       .select("id, title, body, published_at")
       .eq("is_published", true)
-      .order("published_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .eq("show_on_home", true)
+      .order("home_sort_order", { ascending: true })
+      .order("published_at", { ascending: false }),
   ]);
 
   const subtitle = typeof siteSettings?.subtitle === "string" ? siteSettings.subtitle : DEFAULT_SUBTITLE;
@@ -87,10 +87,9 @@ export default async function Home(props: HomeProps) {
   const heroSlideIdsRaw = siteSettings?.hero_slide_ids;
   const heroSlideIds = Array.isArray(heroSlideIdsRaw) ? heroSlideIdsRaw.filter((id: unknown) => typeof id === "string") : [];
 
-  const latestAnnouncementDate =
-    latestAnnouncement?.published_at
-      ? new Date(latestAnnouncement.published_at).toLocaleDateString("ja-JP")
-      : "";
+  const homeAnnouncements = Array.isArray(homeAnnouncementsData)
+    ? (homeAnnouncementsData as { id: string; title: string; body: string; published_at: string | null }[])
+    : [];
 
   if (programsError) console.error("Programs fetch error:", programsError);
   if (slidesError) console.error("Slides fetch error:", slidesError);
@@ -323,12 +322,13 @@ export default async function Home(props: HomeProps) {
       <div className="mx-auto w-full max-w-4xl flex-1 min-w-0">
       <main className="px-6 py-6">
         <GuestBanner />
-        {latestAnnouncement && (
-          <AnnouncementCardWhenLoggedIn
-            title={latestAnnouncement.title}
-            publishedAt={latestAnnouncementDate || null}
-          />
-        )}
+        <HomeAnnouncementCards
+          items={homeAnnouncements.map((a) => ({
+            id: a.id,
+            title: a.title,
+            published_at: a.published_at ?? null,
+          }))}
+        />
         {/* ヒーロースライド（main の px を打ち消して幅いっぱいに） */}
         <section className="-mx-6 mb-6">
           <HeroSlides slides={heroSlides} intervalMs={5500} />
@@ -358,10 +358,10 @@ export default async function Home(props: HomeProps) {
             {inviteCodeSeries.length > 0 && (
               <div id="invite-codes-series" className="mb-10 scroll-mt-24">
                 <p className="mb-3 text-sm" style={{ color: "var(--fg-muted)" }}>
-                  <Link href="/mypage/invite-codes" className="hover:opacity-90">
-                    招待コードの追加・確認
+                  <Link href="/mypage/settings" className="hover:opacity-90">
+                    マイページ（アカウント）から確認
                   </Link>
-                  はマイページから
+                  できます
                 </p>
                 {inviteCodeSeries.map(({ codeId, codeName, codeSlug, slides }) => (
                   <InviteSeriesShelf

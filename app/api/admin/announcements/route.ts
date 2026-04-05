@@ -27,7 +27,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("announcements")
-    .select("id, title, body, is_published, created_at, updated_at, published_at")
+    .select("id, title, body, is_published, created_at, updated_at, published_at, show_on_home, home_sort_order")
     .order("published_at", { ascending: false });
 
   if (error) {
@@ -62,6 +62,11 @@ export async function POST(request: Request) {
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const bodyText = typeof body.body === "string" ? body.body.trim() : "";
   const isPublished = body.is_published === true;
+  const showOnHome = body.show_on_home === true;
+  const homeSortOrder =
+    typeof body.home_sort_order === "number" && Number.isFinite(body.home_sort_order)
+      ? Math.floor(body.home_sort_order)
+      : 0;
 
   if (!title || !bodyText) {
     return NextResponse.json({ error: "タイトルと本文は必須です" }, { status: 400 });
@@ -74,12 +79,14 @@ export async function POST(request: Request) {
     is_published: isPublished,
     published_at: isPublished ? now : body.published_at ?? now,
     updated_at: now,
+    show_on_home: showOnHome,
+    home_sort_order: homeSortOrder,
   };
 
   const { data, error } = await supabaseAdmin
     .from("announcements")
     .insert(row)
-    .select("id, title, body, is_published, created_at, updated_at, published_at")
+    .select("id, title, body, is_published, created_at, updated_at, published_at, show_on_home, home_sort_order")
     .single();
 
   if (error) {

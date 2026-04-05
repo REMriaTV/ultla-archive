@@ -3,15 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { SHOW_PAID_PLAN_UI } from "@/lib/feature-flags";
 
-const SETTINGS_NAV = [
-  { label: "アカウント情報", href: "/mypage/account" },
-  { label: "マイリスト", href: "/mypage/mylist" },
-  { label: "招待コード", href: "/mypage/invite-codes" },
-  { label: "プラン登録", href: "/mypage/subscription" },
-  { label: "設定", href: "/mypage/settings" },
-  { label: "お問い合わせ", href: "/mypage/contact" },
+const SETTINGS_NAV_ALL = [
   { label: "お知らせ", href: "/mypage/announcements" },
+  { label: "アカウント", href: "/mypage/settings" },
+  { label: "マイリスト", href: "/mypage/mylist" },
+  { label: "お問い合わせ", href: "/mypage/contact" },
+  { label: "プラン登録", href: "/mypage/subscription" },
 ] as const;
 
 interface GenreTypeRow {
@@ -29,6 +28,9 @@ interface SidebarProgram {
 
 export function MypageSidebar() {
   const pathname = usePathname();
+  const settingsNav = SETTINGS_NAV_ALL.filter(
+    (item) => SHOW_PAID_PLAN_UI || item.href !== "/mypage/subscription"
+  );
   const [programs, setPrograms] = useState<SidebarProgram[]>([]);
   const [genreTypes, setGenreTypes] = useState<GenreTypeRow[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -136,7 +138,7 @@ export function MypageSidebar() {
               </button>
               {mypageOpen && (
                 <div className="flex flex-col gap-0.5 pl-3">
-                  {SETTINGS_NAV.map(({ label, href }) => (
+                  {settingsNav.map(({ label, href }) => (
                     <Link
                       key={href}
                       href={href}
