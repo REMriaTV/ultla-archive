@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { AuthHeader } from "@/components/AuthHeader";
-import { HeaderInviteCodeInput } from "@/components/HeaderInviteCodeInput";
 import { HeaderPlanBadge } from "@/components/HeaderPlanBadge";
 import { HeaderSearch } from "@/components/HeaderSearch";
 import { InviteGrantChecker } from "@/components/InviteGrantChecker";
@@ -77,7 +76,6 @@ export default async function RootLayout({
                   </Link>
                 </div>
                 <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-4">
-                  <HeaderInviteCodeInput />
                   <HeaderSearch />
                   <HeaderPlanBadge />
                   <AuthHeader />

@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { useExpandedSlide } from "@/components/ExpandedSlideContext";
 import type { Program } from "@/lib/types";
 import type { Slide } from "@/lib/types";
+import { extractYoutubeVideoId } from "@/lib/youtube";
+import { isValidHttpUrl } from "@/lib/external-url";
 
 /** ホバーが使えない環境（タッチデバイス・モバイル）か */
 function usePrefersNoHover(): boolean {
@@ -38,7 +40,9 @@ export interface VideoShelfItem {
   title: string;
   description?: string | null;
   keyword_tags?: string[] | null;
-  youtube_url: string;
+  youtube_url: string | null;
+  youtube_video_id?: string | null;
+  external_watch_url?: string | null;
   thumbnail_url?: string | null;
 }
 
@@ -215,42 +219,46 @@ function SlideThumb({ program, slide, expandedSlideId, onExpandSlide }: SlideThu
   );
 }
 
+function resolveVideoThumbTarget(video: VideoShelfItem): { internal: string } | { external: string } {
+  const ytId =
+    (video.youtube_url && extractYoutubeVideoId(video.youtube_url)) ||
+    (video.youtube_video_id?.trim() ? video.youtube_video_id.trim() : null);
+  const ext = video.external_watch_url?.trim() ?? "";
+  if (ytId) return { internal: `/video/${video.id}` };
+  if (isValidHttpUrl(ext)) return { external: ext };
+  return { internal: `/video/${video.id}` };
+}
+
 function VideoThumb({ program, video, expandedVideoId, onExpandVideo }: VideoThumbProps) {
   const [isHovered, setIsHovered] = useState(false);
   const prefersNoHover = usePrefersNoHover();
   const badge = getProgramBadge(program, "video");
+  const thumbTarget = resolveVideoThumbTarget(video);
+  const isExternalThumb = "external" in thumbTarget;
 
   const expandedByTap = expandedVideoId === video.id;
   const showPanel = isHovered || expandedByTap;
   const captionText = video.description?.trim() || (Array.isArray(video.keyword_tags) ? video.keyword_tags.slice(0, 3).join(" · ") : "");
 
   const handleClick = (e: React.MouseEvent) => {
+    if (isExternalThumb) return;
     if (prefersNoHover && !expandedByTap) {
       e.preventDefault();
       onExpandVideo(video.id);
     }
   };
 
-  return (
-    <div
-      className="relative shrink-0 snap-start program-shelf-thumb"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div className="relative" style={{ paddingBottom: "56.25%" }}>
-        <Link
-          href={`/video/${video.id}`}
-          onClick={handleClick}
-          className="absolute inset-0 overflow-hidden rounded-xl"
-          style={{
-            background: "var(--card-hover)",
-            transition: "transform 0.3s cubic-bezier(0.22,1,0.36,1), box-shadow 0.3s ease",
-            transform: showPanel ? "translateY(-10px) scale(1.02)" : "translateY(0) scale(1)",
-            boxShadow: showPanel
-              ? "0 16px 40px rgba(0,0,0,0.18), 0 4px 10px rgba(0,0,0,0.06)"
-              : "0 2px 8px rgba(0,0,0,0.08)",
-          }}
-        >
+  const thumbStyle: CSSProperties = {
+    background: "var(--card-hover)",
+    transition: "transform 0.3s cubic-bezier(0.22,1,0.36,1), box-shadow 0.3s ease",
+    transform: showPanel ? "translateY(-10px) scale(1.02)" : "translateY(0) scale(1)",
+    boxShadow: showPanel
+      ? "0 16px 40px rgba(0,0,0,0.18), 0 4px 10px rgba(0,0,0,0.06)"
+      : "0 2px 8px rgba(0,0,0,0.08)",
+  };
+
+  const thumbInner = (
+    <>
           {video.thumbnail_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -305,7 +313,36 @@ function VideoThumb({ program, video, expandedVideoId, onExpandVideo }: VideoThu
               {video.title}
             </p>
           </div>
-        </Link>
+    </>
+  );
+
+  return (
+    <div
+      className="relative shrink-0 snap-start program-shelf-thumb"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="relative" style={{ paddingBottom: "56.25%" }}>
+        {isExternalThumb ? (
+          <a
+            href={thumbTarget.external}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute inset-0 overflow-hidden rounded-xl"
+            style={thumbStyle}
+          >
+            {thumbInner}
+          </a>
+        ) : (
+          <Link
+            href={thumbTarget.internal}
+            onClick={handleClick}
+            className="absolute inset-0 overflow-hidden rounded-xl"
+            style={thumbStyle}
+          >
+            {thumbInner}
+          </Link>
+        )}
       </div>
 
       <div
@@ -640,7 +677,7 @@ export function CuratedShelf({
               key={item.id}
               href={item.href}
               target={item.external ? "_blank" : undefined}
-              rel={item.external ? "noreferrer" : undefined}
+              rel={item.external ? "noopener noreferrer" : undefined}
               className="relative shrink-0 snap-start program-shelf-thumb overflow-hidden rounded-xl"
               style={{
                 background: "var(--card-hover)",

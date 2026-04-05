@@ -9,6 +9,25 @@ import { CuratedShelf, InviteSeriesShelf, MylistShelf, ProgramShelf, VideoSeries
 import { SearchSection } from "@/components/SearchSection";
 import { getAccessContext, filterVisibleSlides, canViewVideo } from "@/lib/access";
 import type { Slide } from "@/lib/types";
+import { extractYoutubeVideoId } from "@/lib/youtube";
+import { isValidHttpUrl } from "@/lib/external-url";
+
+type HomeVideoRow = {
+  id: string;
+  youtube_url: string | null;
+  youtube_video_id?: string | null;
+  external_watch_url?: string | null;
+};
+
+function curatedVideoHref(video: HomeVideoRow): { href: string; external: boolean } {
+  const ytId =
+    (video.youtube_url && extractYoutubeVideoId(video.youtube_url)) ||
+    (video.youtube_video_id?.trim() ? video.youtube_video_id.trim() : null);
+  const ext = video.external_watch_url?.trim() ?? "";
+  if (ytId) return { href: `/video/${video.id}`, external: false };
+  if (isValidHttpUrl(ext)) return { href: ext, external: true };
+  return { href: `/video/${video.id}`, external: false };
+}
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -124,7 +143,9 @@ export default async function Home(props: HomeProps) {
     title: string;
     description?: string | null;
     keyword_tags?: string[] | null;
-    youtube_url: string;
+    youtube_url: string | null;
+    youtube_video_id?: string | null;
+    external_watch_url?: string | null;
     thumbnail_url: string | null;
     visibility?: "free" | "invite_only" | "private" | null;
     content_tier?: "basic" | "pro" | "advance" | null;
@@ -145,7 +166,9 @@ export default async function Home(props: HomeProps) {
       title: video.title,
       description: video.description ?? null,
       keyword_tags: Array.isArray(video.keyword_tags) ? video.keyword_tags : [],
-      youtube_url: video.youtube_url,
+      youtube_url: video.youtube_url ?? null,
+      youtube_video_id: video.youtube_video_id ?? null,
+      external_watch_url: video.external_watch_url ?? null,
       thumbnail_url: video.thumbnail_url ?? null,
     });
     videosByProgram.set(pid, list);
@@ -191,13 +214,14 @@ export default async function Home(props: HomeProps) {
           }
           const video = visibleVideosById.get(String(item.content_id));
           if (!video) return null;
+          const { href, external } = curatedVideoHref(video);
           return {
             id: `${shelf.id}-video-${video.id}`,
             type: "video",
             title: video.title,
-            href: `/video/${video.id}`,
+            href,
             thumbnail_url: video.thumbnail_url ?? null,
-            external: false,
+            external,
           };
         })
         .filter(Boolean) as CuratedShelfItem[];

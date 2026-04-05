@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { KeywordTagInput } from "@/components/KeywordTagInput";
 import { AnnouncementMarkdown } from "@/components/AnnouncementMarkdown";
+import { extractYoutubeVideoId } from "@/lib/youtube";
+import { isValidHttpUrl } from "@/lib/external-url";
 
 type SlideVisibility = "free" | "invite_only" | "private";
 type ContentTier = "basic" | "pro" | "advance";
@@ -55,6 +57,44 @@ function thumbPageIndexFromSlide(slide: SlideRow): number {
   return 1;
 }
 
+/** 一覧サムネが PDF ページ画像ではなくアップロード画像などのとき true */
+function slideHasCustomThumbnail(slide: SlideRow): boolean {
+  const urls = slide.page_image_urls ?? [];
+  const img = slide.image_url?.trim();
+  if (!img) return false;
+  if (urls.length === 0) return true;
+  return !urls.includes(img);
+}
+
+const THUMB_ACCEPT_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+function firstAcceptedImageFile(list: FileList | File[] | null | undefined): File | null {
+  if (!list || list.length === 0) return null;
+  const n = list.length;
+  for (let i = 0; i < n; i++) {
+    const f = "item" in list && typeof list.item === "function" ? list.item(i) : (list as File[])[i];
+    if (f && THUMB_ACCEPT_MIME.has(f.type)) return f;
+  }
+  return null;
+}
+
+/** ドラッグ＆ドロップ・クリップボード用（DataTransfer / ClipboardEvent.clipboardData） */
+function firstImageFileFromDataTransfer(dt: DataTransfer | null): File | null {
+  if (!dt) return null;
+  const direct = firstAcceptedImageFile(dt.files);
+  if (direct) return direct;
+  const items = dt.items;
+  if (!items) return null;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    if (it.kind === "file") {
+      const f = it.getAsFile();
+      if (f && THUMB_ACCEPT_MIME.has(f.type)) return f;
+    }
+  }
+  return null;
+}
+
 interface GenreTypeRow {
   id: string;
   name: string;
@@ -98,6 +138,9 @@ export default function AdminPage() {
     thumbnail_page: "1",
   });
   const [saving, setSaving] = useState(false);
+  /** 編集モーダル開いたときの「サムネページ」表示値（カスタムサムネ時の保存で誤って上書きしないため） */
+  const [slideThumbPageOnOpen, setSlideThumbPageOnOpen] = useState("1");
+  const [slideEditThumbUploading, setSlideEditThumbUploading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [extractingKeywords, setExtractingKeywords] = useState(false);
   const [extractingCaption, setExtractingCaption] = useState(false);
@@ -231,22 +274,28 @@ export default function AdminPage() {
     title: string;
     description: string | null;
     keyword_tags: string[];
-    youtube_url: string;
+    youtube_url: string | null;
     youtube_video_id: string | null;
+    external_watch_url?: string | null;
     program_id: number;
     visibility: SlideVisibility;
     content_tier: ContentTier;
     is_published: boolean;
     slide_ids: number[];
     created_at: string;
+    thumbnail_url?: string | null;
   }>>([]);
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [creatingVideo, setCreatingVideo] = useState(false);
   const [savingVideo, setSavingVideo] = useState(false);
+  const [videoThumbUploading, setVideoThumbUploading] = useState(false);
+  const [pendingVideoThumbnailFile, setPendingVideoThumbnailFile] = useState<File | null>(null);
   const [videoForm, setVideoForm] = useState({
     title: "",
     description: "",
     youtube_url: "",
+    external_watch_url: "",
+    thumbnail_url: "",
     program_id: "",
     visibility: "free" as SlideVisibility,
     content_tier: "basic" as ContentTier,
@@ -262,6 +311,8 @@ export default function AdminPage() {
     title: "",
     description: "",
     youtube_url: "",
+    external_watch_url: "",
+    thumbnail_url: "",
     program_id: "",
     visibility: "free" as SlideVisibility,
     content_tier: "basic" as ContentTier,
@@ -626,14 +677,55 @@ export default function AdminPage() {
     }
   }
 
+  async function uploadVideoThumbnailFile(videoId: string, file: File) {
+    setVideoThumbUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/admin/videos/${encodeURIComponent(videoId)}/thumbnail`, {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(json.error ?? "サムネイルのアップロードに失敗しました");
+        return;
+      }
+      await loadVideos();
+      const url = typeof json.thumbnail_url === "string" ? json.thumbnail_url : "";
+      if (url) {
+        setEditingVideo((v) => (v && v.id === videoId ? { ...v, thumbnail_url: url } : v));
+        setVideoEditForm((f) => ({ ...f, thumbnail_url: url }));
+      }
+    } finally {
+      setVideoThumbUploading(false);
+    }
+  }
+
   async function handleCreateVideo(e: React.FormEvent) {
     e.preventDefault();
-    if (!videoForm.title.trim() || !videoForm.youtube_url.trim() || !videoForm.program_id) {
-      alert("タイトル・動画URL・シリーズは必須です");
+    const ytIn = videoForm.youtube_url.trim();
+    const extIn = videoForm.external_watch_url.trim();
+    const ytId = ytIn ? extractYoutubeVideoId(ytIn) : null;
+    if (!videoForm.title.trim() || !videoForm.program_id) {
+      alert("タイトル・シリーズは必須です");
+      return;
+    }
+    if (ytIn && !ytId) {
+      alert("YouTube の動画URLの形式が不正です");
+      return;
+    }
+    if (extIn && !isValidHttpUrl(extIn)) {
+      alert("外部視聴URLは http(s) で始まる必要があります");
+      return;
+    }
+    if (!ytId && !isValidHttpUrl(extIn)) {
+      alert("YouTube の動画URL または 外部視聴URL のどちらかを入力してください");
       return;
     }
     setSavingVideo(true);
     try {
+      const manualThumb = videoForm.thumbnail_url.trim();
       const res = await fetch("/api/admin/videos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -641,7 +733,9 @@ export default function AdminPage() {
           title: videoForm.title.trim(),
           description: videoForm.description.trim() || null,
           keyword_tags: videoKeywordTags,
-          youtube_url: videoForm.youtube_url.trim(),
+          youtube_url: ytIn,
+          external_watch_url: extIn,
+          ...(manualThumb ? { thumbnail_url: manualThumb } : {}),
           program_id: Number(videoForm.program_id),
           visibility: videoForm.visibility,
           content_tier: videoForm.content_tier,
@@ -654,6 +748,11 @@ export default function AdminPage() {
         alert(`動画作成失敗: ${json.error ?? "エラー"}`);
         return;
       }
+      const newId = typeof json.id === "string" ? json.id : null;
+      if (newId && pendingVideoThumbnailFile) {
+        await uploadVideoThumbnailFile(newId, pendingVideoThumbnailFile);
+        setPendingVideoThumbnailFile(null);
+      }
       const selectedVideoBadgeLabel =
         videoBadgeSelect === "__new__" ? videoBadgeNewLabel.trim() : videoBadgeSelect.trim();
       if (videoForm.program_id) {
@@ -665,6 +764,8 @@ export default function AdminPage() {
         title: "",
         description: "",
         youtube_url: "",
+        external_watch_url: "",
+        thumbnail_url: "",
         program_id: "",
         visibility: "free",
         content_tier: "basic",
@@ -752,6 +853,8 @@ export default function AdminPage() {
       title: video.title ?? "",
       description: video.description ?? "",
       youtube_url: video.youtube_url ?? "",
+      external_watch_url: video.external_watch_url?.trim() ?? "",
+      thumbnail_url: video.thumbnail_url?.trim() ?? "",
       program_id: String(video.program_id ?? ""),
       visibility: (video.visibility ?? "free") as SlideVisibility,
       content_tier: (video.content_tier ?? "basic") as ContentTier,
@@ -771,8 +874,23 @@ export default function AdminPage() {
   async function handleUpdateVideo(e: React.FormEvent) {
     e.preventDefault();
     if (!editingVideo) return;
-    if (!videoEditForm.title.trim() || !videoEditForm.youtube_url.trim() || !videoEditForm.program_id) {
-      alert("タイトル・動画URL・シリーズは必須です");
+    const ytIn = videoEditForm.youtube_url.trim();
+    const extIn = videoEditForm.external_watch_url.trim();
+    const ytId = ytIn ? extractYoutubeVideoId(ytIn) : null;
+    if (!videoEditForm.title.trim() || !videoEditForm.program_id) {
+      alert("タイトル・シリーズは必須です");
+      return;
+    }
+    if (ytIn && !ytId) {
+      alert("YouTube の動画URLの形式が不正です");
+      return;
+    }
+    if (extIn && !isValidHttpUrl(extIn)) {
+      alert("外部視聴URLは http(s) で始まる必要があります");
+      return;
+    }
+    if (!ytId && !isValidHttpUrl(extIn)) {
+      alert("YouTube の動画URL または 外部視聴URL のどちらかを入力してください");
       return;
     }
     setSavingVideo(true);
@@ -784,7 +902,11 @@ export default function AdminPage() {
           title: videoEditForm.title.trim(),
           description: videoEditForm.description.trim() || null,
           keyword_tags: videoEditKeywordTags,
-          youtube_url: videoEditForm.youtube_url.trim(),
+          youtube_url: ytIn,
+          external_watch_url: extIn,
+          ...(videoEditForm.thumbnail_url.trim()
+            ? { thumbnail_url: videoEditForm.thumbnail_url.trim() }
+            : {}),
           program_id: Number(videoEditForm.program_id),
           visibility: videoEditForm.visibility,
           content_tier: videoEditForm.content_tier,
@@ -1604,6 +1726,7 @@ export default function AdminPage() {
 
   function openEdit(slide: SlideRow) {
     setEditingSlide(slide);
+    setSlideThumbPageOnOpen(String(thumbPageIndexFromSlide(slide)));
     const tags = slide.keyword_tags ?? [];
     setEditForm({
       title: slide.title,
@@ -1642,9 +1765,13 @@ export default function AdminPage() {
         visibility: editForm.visibility,
         content_tier: editForm.content_tier,
       };
-      const pageCount = editingSlide.page_image_urls?.length ?? 0;
-      if (pageCount > 0) {
-        const tp = parseInt(editForm.thumbnail_page.trim(), 10);
+      const urls = editingSlide.page_image_urls ?? [];
+      const pageCount = urls.length;
+      const hasCustomThumb = slideHasCustomThumbnail(editingSlide);
+      const tp = parseInt(editForm.thumbnail_page.trim(), 10);
+      const thumbPageChanged =
+        !Number.isNaN(tp) && tp >= 1 && String(tp) !== slideThumbPageOnOpen;
+      if (pageCount > 0 && (!hasCustomThumb || thumbPageChanged)) {
         if (!Number.isNaN(tp) && tp >= 1) {
           patchBody.thumbnail_page_index = tp;
         }
@@ -1694,6 +1821,66 @@ export default function AdminPage() {
       alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setConvertingId(null);
+    }
+  }
+
+  async function uploadSlideThumbnailForEdit(slideId: string, file: File) {
+    setSlideEditThumbUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/admin/slides/${encodeURIComponent(slideId)}/thumbnail`, {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(json.error ?? "サムネイルのアップロードに失敗しました");
+        return;
+      }
+      const url = typeof json.image_url === "string" ? json.image_url : "";
+      if (url) {
+        setEditingSlide((s) => (s && s.id === slideId ? { ...s, image_url: url } : s));
+      }
+      await loadSlides();
+    } finally {
+      setSlideEditThumbUploading(false);
+    }
+  }
+
+  async function revertSlideThumbnailToPage() {
+    if (!editingSlide) return;
+    const urls = editingSlide.page_image_urls ?? [];
+    if (urls.length === 0) return;
+    const tp = parseInt(editForm.thumbnail_page.trim(), 10);
+    if (Number.isNaN(tp) || tp < 1 || tp > urls.length) {
+      alert(`サムネイルに使うページを 1〜${urls.length} の範囲で指定してください`);
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/slides/${encodeURIComponent(editingSlide.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thumbnail_page_index: tp }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(`更新失敗: ${json.error ?? ""}\n${json.details ?? ""}`);
+        return;
+      }
+      const slide = json.slide as SlideRow | undefined;
+      if (slide) {
+        setEditingSlide(slide);
+        const n = thumbPageIndexFromSlide(slide);
+        setSlideThumbPageOnOpen(String(n));
+        setEditForm((f) => ({ ...f, thumbnail_page: String(n) }));
+      }
+      await loadSlides();
+    } catch (err) {
+      alert(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -3837,11 +4024,14 @@ export default function AdminPage() {
                   title: "",
                   description: "",
                   youtube_url: "",
+                  external_watch_url: "",
+                  thumbnail_url: "",
                   program_id: "",
                   visibility: "free",
                   content_tier: "basic",
                   is_published: true,
                 });
+                setPendingVideoThumbnailFile(null);
                 setVideoKeywordTags([]);
                 setVideoBadgeSelect("");
                 setVideoBadgeNewLabel("");
@@ -3877,7 +4067,16 @@ export default function AdminPage() {
                   {videos.map((v) => (
                     <tr key={v.id} className="border-b border-neutral-100 last:border-0">
                       <td className="max-w-[280px] truncate px-4 py-3 text-neutral-800" title={v.title}>
-                        <a href={v.youtube_url} target="_blank" rel="noreferrer" className="hover:underline">
+                        <a
+                          href={
+                            v.youtube_url?.trim()
+                              ? v.youtube_url
+                              : v.external_watch_url?.trim() || `/video/${encodeURIComponent(v.id)}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:underline"
+                        >
                           {v.title}
                         </a>
                       </td>
@@ -3936,15 +4135,82 @@ export default function AdminPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-neutral-600">動画URL *</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">YouTube の動画URL（任意）</label>
+                <p className="mb-1 text-[11px] text-neutral-500">
+                  東大 OCW など YouTube にない場合は空にし、下の「外部視聴URL」に公式ページを入力してください。どちらか一方（または両方）があれば登録できます。
+                </p>
                 <input
                   type="url"
                   value={videoForm.youtube_url}
                   onChange={(e) => setVideoForm((f) => ({ ...f, youtube_url: e.target.value }))}
                   className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
                   placeholder="https://www.youtube.com/watch?v=..."
-                  required
                 />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">外部視聴URL（任意）</label>
+                <input
+                  type="url"
+                  value={videoForm.external_watch_url}
+                  onChange={(e) => setVideoForm((f) => ({ ...f, external_watch_url: e.target.value }))}
+                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  placeholder="https://ocw.u-tokyo.ac.jp/... など"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">サムネイル画像（任意）</label>
+                <p className="mb-1 text-[11px] text-neutral-500">
+                  未指定時は YouTube の既定サムネイルです。URL 入力・ファイル選択・ドラッグ＆ドロップ・枠をクリック後の貼り付け（⌘V / Ctrl+V）で指定できます（作成後にアップロードされるファイルもここで選べます）。
+                </p>
+                <input
+                  type="url"
+                  value={videoForm.thumbnail_url}
+                  onChange={(e) => setVideoForm((f) => ({ ...f, thumbnail_url: e.target.value }))}
+                  className="mb-2 w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  placeholder="https://... （外部に置いた画像のURL）"
+                />
+                <div
+                  role="group"
+                  tabIndex={0}
+                  aria-label="作成後アップロードするサムネイル画像"
+                  className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50/80 p-3 outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const file = firstImageFileFromDataTransfer(e.dataTransfer);
+                    if (!file) {
+                      alert("JPEG / PNG / WebP / GIF の画像ファイルをドロップしてください");
+                      return;
+                    }
+                    setPendingVideoThumbnailFile(file);
+                  }}
+                  onPaste={(e) => {
+                    const file = firstImageFileFromDataTransfer(e.clipboardData);
+                    if (!file) return;
+                    e.preventDefault();
+                    setPendingVideoThumbnailFile(file);
+                  }}
+                >
+                  <p className="mb-2 text-[11px] text-neutral-600">
+                    作成後にアップロードする画像を、ドラッグ＆ドロップまたは貼り付けで指定できます。
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="text-xs text-neutral-700"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      setPendingVideoThumbnailFile(f ?? null);
+                    }}
+                  />
+                  {pendingVideoThumbnailFile && (
+                    <p className="mt-1 text-[11px] text-neutral-600">選択中: {pendingVideoThumbnailFile.name}（作成後にアップロードされます）</p>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-neutral-600">キーワードタグ</label>
@@ -4173,8 +4439,127 @@ export default function AdminPage() {
                     <textarea value={videoEditForm.description} onChange={(e) => setVideoEditForm((f) => ({ ...f, description: e.target.value }))} rows={3} className="w-full resize-y rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-neutral-600">動画URL *</label>
-                    <input type="url" value={videoEditForm.youtube_url} onChange={(e) => setVideoEditForm((f) => ({ ...f, youtube_url: e.target.value }))} className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900" required />
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">YouTube の動画URL（任意）</label>
+                    <p className="mb-1 text-[11px] text-neutral-500">
+                      外部のみの場合は空にし、「外部視聴URL」を入力してください。
+                    </p>
+                    <input
+                      type="url"
+                      value={videoEditForm.youtube_url}
+                      onChange={(e) => setVideoEditForm((f) => ({ ...f, youtube_url: e.target.value }))}
+                      className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                      placeholder="https://www.youtube.com/watch?v=..."
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">外部視聴URL（任意）</label>
+                    <input
+                      type="url"
+                      value={videoEditForm.external_watch_url}
+                      onChange={(e) => setVideoEditForm((f) => ({ ...f, external_watch_url: e.target.value }))}
+                      className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                      placeholder="https://ocw.u-tokyo.ac.jp/... など"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">サムネイル画像</label>
+                    <p className="mb-1 text-[11px] text-neutral-500">
+                      一覧・棚に表示される画像です。URL の直接入力、ファイル選択、ドラッグ＆ドロップ、または枠内をクリックしてから貼り付け（⌘V / Ctrl+V）も使えます。YouTube 既定に戻すこともできます。
+                    </p>
+                    <div
+                      role="group"
+                      tabIndex={0}
+                      aria-label="サムネイル画像をドロップまたは貼り付け"
+                      className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50/80 p-3 outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const file = firstImageFileFromDataTransfer(e.dataTransfer);
+                        if (!file) {
+                          alert("JPEG / PNG / WebP / GIF の画像ファイルをドロップしてください");
+                          return;
+                        }
+                        if (!editingVideo) return;
+                        await uploadVideoThumbnailFile(editingVideo.id, file);
+                      }}
+                      onPaste={async (e) => {
+                        const file = firstImageFileFromDataTransfer(e.clipboardData);
+                        if (!file || !editingVideo) return;
+                        e.preventDefault();
+                        await uploadVideoThumbnailFile(editingVideo.id, file);
+                      }}
+                    >
+                      <p className="mb-2 text-[11px] text-neutral-600">
+                        ここに画像をドラッグするか、枠をクリックしてフォーカスしてから貼り付け（コピーした画像を ⌘V / Ctrl+V）。
+                      </p>
+                      {videoEditForm.thumbnail_url ? (
+                        <div className="mb-2 overflow-hidden rounded border border-neutral-200 bg-neutral-100">
+                          <img
+                            src={videoEditForm.thumbnail_url}
+                            alt=""
+                            className="mx-auto max-h-36 w-auto object-contain"
+                          />
+                        </div>
+                      ) : null}
+                      <input
+                        type="url"
+                        value={videoEditForm.thumbnail_url}
+                        onChange={(e) => setVideoEditForm((f) => ({ ...f, thumbnail_url: e.target.value }))}
+                        className="mb-2 w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                        placeholder="画像URL（https://...）"
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          disabled={videoThumbUploading}
+                          className="text-xs text-neutral-700"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = "";
+                            if (!file || !editingVideo) return;
+                            await uploadVideoThumbnailFile(editingVideo.id, file);
+                          }}
+                        />
+                        {videoThumbUploading && <span className="text-xs text-neutral-500">アップロード中...</span>}
+                        {editingVideo?.youtube_video_id && (
+                          <button
+                            type="button"
+                            className="rounded border border-neutral-300 bg-white px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                            disabled={videoThumbUploading}
+                            onClick={async () => {
+                              if (!editingVideo?.youtube_video_id) return;
+                              const yt = editingVideo.youtube_video_id;
+                              const thumb = `https://img.youtube.com/vi/${yt}/hqdefault.jpg`;
+                              setVideoThumbUploading(true);
+                              try {
+                                const res = await fetch(`/api/admin/videos/${encodeURIComponent(editingVideo.id)}`, {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ thumbnail_url: thumb }),
+                                });
+                                const json = await res.json().catch(() => ({}));
+                                if (!res.ok) {
+                                  alert(json.error ?? "更新に失敗しました");
+                                  return;
+                                }
+                                setVideoEditForm((f) => ({ ...f, thumbnail_url: thumb }));
+                                setEditingVideo((v) => (v ? { ...v, thumbnail_url: thumb } : null));
+                                await loadVideos();
+                              } finally {
+                                setVideoThumbUploading(false);
+                              }
+                            }}
+                          >
+                            YouTube のサムネに戻す
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-neutral-600">キーワードタグ</label>
@@ -4790,6 +5175,80 @@ export default function AdminPage() {
                     />
                   </div>
                 )}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-neutral-700">
+                    サムネイル画像（ファイルアップロード）
+                  </label>
+                  <p className="mb-2 text-xs text-neutral-500">
+                    一覧・棚に表示する画像だけを差し替えます（PDF のページ指定より優先）。JPEG / PNG / WebP / GIF、最大5MB。ドラッグ＆ドロップ・貼り付け（枠をクリック後 ⌘V / Ctrl+V）にも対応しています。
+                  </p>
+                  <div
+                    role="group"
+                    tabIndex={0}
+                    aria-label="スライドサムネイルをドロップまたは貼り付け"
+                    className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50/80 p-3 outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const file = firstImageFileFromDataTransfer(e.dataTransfer);
+                      if (!file) {
+                        alert("JPEG / PNG / WebP / GIF の画像ファイルをドロップしてください");
+                        return;
+                      }
+                      if (!editingSlide) return;
+                      await uploadSlideThumbnailForEdit(editingSlide.id, file);
+                    }}
+                    onPaste={async (e) => {
+                      const file = firstImageFileFromDataTransfer(e.clipboardData);
+                      if (!file || !editingSlide) return;
+                      e.preventDefault();
+                      await uploadSlideThumbnailForEdit(editingSlide.id, file);
+                    }}
+                  >
+                    <p className="mb-2 text-[11px] text-neutral-600">
+                      ここに画像をドラッグするか、枠をクリックしてから貼り付け。
+                    </p>
+                    {editingSlide.image_url ? (
+                      <div className="mb-2 overflow-hidden rounded border border-neutral-200 bg-neutral-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={editingSlide.image_url}
+                          alt=""
+                          className="mx-auto max-h-32 w-auto object-contain"
+                        />
+                      </div>
+                    ) : null}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      disabled={slideEditThumbUploading || saving}
+                      className="text-xs text-neutral-700"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (!file || !editingSlide) return;
+                        await uploadSlideThumbnailForEdit(editingSlide.id, file);
+                      }}
+                    />
+                    {slideEditThumbUploading ? (
+                      <span className="ml-2 text-xs text-neutral-500">アップロード中...</span>
+                    ) : null}
+                    {editingSlide.page_image_urls && editingSlide.page_image_urls.length > 0 && slideHasCustomThumbnail(editingSlide) ? (
+                      <button
+                        type="button"
+                        disabled={saving || slideEditThumbUploading}
+                        onClick={() => void revertSlideThumbnailToPage()}
+                        className="mt-2 rounded border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                      >
+                        PDFのページ画像に戻す（上の「サムネイルに使うページ」）
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-neutral-700">
                     キャプション

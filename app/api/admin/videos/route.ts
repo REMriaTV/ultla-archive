@@ -1,29 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { extractYoutubeVideoId } from "@/lib/youtube";
+import { isValidHttpUrl } from "@/lib/external-url";
 
 export const dynamic = "force-dynamic";
-
-function extractYoutubeVideoId(url: string): string | null {
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-  try {
-    const u = new URL(trimmed);
-    if (u.hostname.includes("youtu.be")) {
-      return u.pathname.replace("/", "").slice(0, 11) || null;
-    }
-    if (u.hostname.includes("youtube.com")) {
-      const fromQuery = u.searchParams.get("v");
-      if (fromQuery) return fromQuery.slice(0, 11);
-      const parts = u.pathname.split("/").filter(Boolean);
-      const embedIdx = parts.findIndex((p) => p === "embed" || p === "shorts");
-      if (embedIdx >= 0 && parts[embedIdx + 1]) return parts[embedIdx + 1].slice(0, 11);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -79,6 +60,8 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const youtubeUrl = typeof body.youtube_url === "string" ? body.youtube_url.trim() : "";
+  const externalWatchUrl =
+    typeof body.external_watch_url === "string" ? body.external_watch_url.trim() : "";
   const description = typeof body.description === "string" ? body.description.trim() : null;
   const keywordTags = Array.isArray(body.keyword_tags)
     ? body.keyword_tags
@@ -91,24 +74,39 @@ export async function POST(request: Request) {
   const sortOrder = typeof body.sort_order === "number" ? body.sort_order : Number(body.sort_order) || 0;
   const isPublished = body.is_published !== false;
   const slideIds = Array.isArray(body.slide_ids) ? body.slide_ids.map((v: unknown) => Number(v)).filter((n: number) => Number.isFinite(n)) : [];
+  const customThumbnailUrl =
+    typeof body.thumbnail_url === "string" && body.thumbnail_url.trim().length > 0
+      ? body.thumbnail_url.trim()
+      : null;
 
-  if (!title || !youtubeUrl || !Number.isFinite(programId)) {
-    return NextResponse.json({ error: "タイトル / 動画URL / シリーズは必須です" }, { status: 400 });
+  if (!title || !Number.isFinite(programId)) {
+    return NextResponse.json({ error: "タイトル / シリーズは必須です" }, { status: 400 });
   }
 
-  const videoId = extractYoutubeVideoId(youtubeUrl);
-  if (!videoId) {
-    return NextResponse.json({ error: "動画URL の形式が不正です" }, { status: 400 });
+  const videoId = youtubeUrl ? extractYoutubeVideoId(youtubeUrl) : null;
+  if (youtubeUrl && !videoId) {
+    return NextResponse.json({ error: "YouTube の動画URLの形式が不正です" }, { status: 400 });
+  }
+  if (externalWatchUrl && !isValidHttpUrl(externalWatchUrl)) {
+    return NextResponse.json({ error: "外部視聴URLは http(s) で始まる必要があります" }, { status: 400 });
+  }
+  if (!videoId && !isValidHttpUrl(externalWatchUrl)) {
+    return NextResponse.json(
+      { error: "YouTube の動画URL または 外部視聴URL のどちらかを入力してください" },
+      { status: 400 },
+    );
   }
 
-  const thumbnail = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+  const thumbnail =
+    customThumbnailUrl ?? (videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null);
   const now = new Date().toISOString();
   const { data: created, error: createError } = await supabaseAdmin
     .from("videos")
     .insert({
       title,
-      youtube_url: youtubeUrl,
+      youtube_url: videoId ? youtubeUrl : null,
       youtube_video_id: videoId,
+      external_watch_url: externalWatchUrl || null,
       thumbnail_url: thumbnail,
       description,
       keyword_tags: keywordTags,

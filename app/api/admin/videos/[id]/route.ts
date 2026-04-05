@@ -1,27 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { extractYoutubeVideoId } from "@/lib/youtube";
+import { isValidHttpUrl } from "@/lib/external-url";
 
 export const dynamic = "force-dynamic";
-
-function extractYoutubeVideoId(url: string): string | null {
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-  try {
-    const u = new URL(trimmed);
-    if (u.hostname.includes("youtu.be")) return u.pathname.replace("/", "").slice(0, 11) || null;
-    if (u.hostname.includes("youtube.com")) {
-      const q = u.searchParams.get("v");
-      if (q) return q.slice(0, 11);
-      const parts = u.pathname.split("/").filter(Boolean);
-      const i = parts.findIndex((p) => p === "embed" || p === "shorts");
-      if (i >= 0 && parts[i + 1]) return parts[i + 1].slice(0, 11);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -65,13 +48,51 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     updates.is_published = body.is_published;
     if (body.is_published) updates.published_at = new Date().toISOString();
   }
-  if (typeof body.youtube_url === "string") {
-    const nextUrl = body.youtube_url.trim();
-    const videoId = extractYoutubeVideoId(nextUrl);
-    if (!videoId) return NextResponse.json({ error: "動画URL の形式が不正です" }, { status: 400 });
-    updates.youtube_url = nextUrl;
-    updates.youtube_video_id = videoId;
-    updates.thumbnail_url = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+  if (body.youtube_url !== undefined) {
+    const nextUrl = typeof body.youtube_url === "string" ? body.youtube_url.trim() : "";
+    if (!nextUrl) {
+      updates.youtube_url = null;
+      updates.youtube_video_id = null;
+      if (typeof body.thumbnail_url === "string") {
+        updates.thumbnail_url = body.thumbnail_url.trim();
+      }
+    } else {
+      const vid = extractYoutubeVideoId(nextUrl);
+      if (!vid) return NextResponse.json({ error: "YouTube の動画URLの形式が不正です" }, { status: 400 });
+      updates.youtube_url = nextUrl;
+      updates.youtube_video_id = vid;
+      if (typeof body.thumbnail_url === "string" && body.thumbnail_url.trim().length > 0) {
+        updates.thumbnail_url = body.thumbnail_url.trim();
+      } else {
+        updates.thumbnail_url = `https://img.youtube.com/vi/${vid}/hqdefault.jpg`;
+      }
+    }
+  } else if (typeof body.thumbnail_url === "string") {
+    updates.thumbnail_url = body.thumbnail_url.trim();
+  }
+  if (body.external_watch_url !== undefined) {
+    const ext = typeof body.external_watch_url === "string" ? body.external_watch_url.trim() : "";
+    updates.external_watch_url = ext || null;
+    if (ext && !isValidHttpUrl(ext)) {
+      return NextResponse.json({ error: "外部視聴URLは http(s) で始まる必要があります" }, { status: 400 });
+    }
+  }
+
+  const { data: existingRow, error: fetchErr } = await supabaseAdmin.from("videos").select("*").eq("id", id).single();
+  if (fetchErr || !existingRow) {
+    return NextResponse.json({ error: fetchErr?.message ?? "動画が見つかりません" }, { status: 404 });
+  }
+
+  const merged = { ...existingRow, ...updates } as Record<string, unknown>;
+  const mergedYoutube = typeof merged.youtube_url === "string" ? merged.youtube_url : "";
+  const mergedYtId = extractYoutubeVideoId(mergedYoutube);
+  const mergedExt =
+    typeof merged.external_watch_url === "string" ? merged.external_watch_url.trim() : "";
+  if (!mergedYtId && !isValidHttpUrl(mergedExt)) {
+    return NextResponse.json(
+      { error: "YouTube の動画URL または 外部視聴URL のどちらかが必要です" },
+      { status: 400 },
+    );
   }
 
   const { error: updateError } = await supabaseAdmin.from("videos").update(updates).eq("id", id);

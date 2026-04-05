@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { canViewVideo, getAccessContext } from "@/lib/access";
 import { VideoEpisodeRail } from "@/components/VideoEpisodeRail";
+import { extractYoutubeVideoId } from "@/lib/youtube";
+import { isValidHttpUrl } from "@/lib/external-url";
 
 interface VideoDetailPageProps {
   params: Promise<{ id: string }>;
@@ -14,8 +16,9 @@ type VideoRow = {
   title: string;
   description?: string | null;
   keyword_tags?: string[] | null;
-  youtube_url: string;
+  youtube_url: string | null;
   youtube_video_id?: string | null;
+  external_watch_url?: string | null;
   thumbnail_url?: string | null;
   program_id: string | number;
   visibility?: "free" | "invite_only" | "private" | null;
@@ -25,27 +28,15 @@ type VideoRow = {
   created_at?: string | null;
 };
 
-function extractYoutubeId(url: string, fallback?: string | null): string | null {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) {
-      const id = u.pathname.replace("/", "").trim();
-      return id || null;
-    }
-    if (u.searchParams.get("v")) return u.searchParams.get("v");
-    const m = u.pathname.match(/\/(embed|shorts)\/([^/?]+)/);
-    if (m?.[2]) return m[2];
-    if (fallback && fallback.trim()) return fallback.trim();
-    return null;
-  } catch {
-    if (fallback && fallback.trim()) return fallback.trim();
-    return null;
-  }
+function getEmbedYoutubeId(video: VideoRow): string | null {
+  const fromUrl = video.youtube_url ? extractYoutubeVideoId(video.youtube_url) : null;
+  if (fromUrl) return fromUrl;
+  return video.youtube_video_id?.trim() || null;
 }
 
 function getVideoThumbUrl(video: VideoRow): string | null {
   if (video.thumbnail_url && video.thumbnail_url.trim()) return video.thumbnail_url.trim();
-  const ytId = extractYoutubeId(video.youtube_url, video.youtube_video_id);
+  const ytId = getEmbedYoutubeId(video);
   if (!ytId) return null;
   return `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`;
 }
@@ -85,8 +76,10 @@ export default async function VideoDetailPage({ params }: VideoDetailPageProps) 
   const prev = idx > 0 ? visibleSeriesVideos[idx - 1] : null;
   const next = idx >= 0 && idx < visibleSeriesVideos.length - 1 ? visibleSeriesVideos[idx + 1] : null;
 
-  const youtubeId = extractYoutubeId(current.youtube_url, current.youtube_video_id);
-  if (!youtubeId) notFound();
+  const youtubeId = getEmbedYoutubeId(current);
+  const externalWatch = current.external_watch_url?.trim() ?? "";
+  const hasExternalWatch = isValidHttpUrl(externalWatch);
+  if (!youtubeId && !hasExternalWatch) notFound();
   const embedParams = new URLSearchParams({
     rel: "0",
     modestbranding: "1",
@@ -116,18 +109,47 @@ export default async function VideoDetailPage({ params }: VideoDetailPageProps) 
           )}
         </div>
 
-        <section className="mb-6 overflow-hidden rounded-lg border" style={{ borderColor: "var(--border)", background: "var(--card-hover)" }}>
-          <div className="aspect-video w-full">
-            <iframe
-              src={`https://www.youtube-nocookie.com/embed/${youtubeId}?${embedParams.toString()}`}
-              title={current.title}
-              className="h-full w-full border-0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
-            />
-          </div>
-        </section>
+        {youtubeId && (
+          <section className="mb-6 overflow-hidden rounded-lg border" style={{ borderColor: "var(--border)", background: "var(--card-hover)" }}>
+            <div className="aspect-video w-full">
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${youtubeId}?${embedParams.toString()}`}
+                title={current.title}
+                className="h-full w-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            </div>
+          </section>
+        )}
+
+        {!youtubeId && hasExternalWatch && (
+          <section className="mb-6 overflow-hidden rounded-lg border px-4 py-10 sm:py-14" style={{ borderColor: "var(--border)", background: "var(--card-hover)" }}>
+            <div className="mx-auto flex max-w-lg flex-col items-center gap-4 text-center">
+              <p className="text-sm leading-relaxed" style={{ color: "var(--fg-muted)" }}>
+                このコンテンツは外部サイトで視聴できます（例: 大学の公開講座ページ）。
+              </p>
+              <a
+                href={externalWatch}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
+                style={{ background: "var(--fg)", color: "var(--bg)" }}
+              >
+                外部サイトで視聴する
+              </a>
+            </div>
+          </section>
+        )}
+
+        {youtubeId && hasExternalWatch && (
+          <p className="mb-6 text-sm" style={{ color: "var(--fg-muted)" }}>
+            <a href={externalWatch} target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-2 hover:opacity-80" style={{ color: "var(--fg)" }}>
+              別サイト（公式ページ）でも視聴できる場合があります
+            </a>
+          </p>
+        )}
 
         {current.description?.trim() && (
           <p className="mb-5 whitespace-pre-wrap text-sm leading-relaxed" style={{ color: "var(--fg-muted)" }}>
