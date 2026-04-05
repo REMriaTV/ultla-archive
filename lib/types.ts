@@ -28,8 +28,10 @@ export interface Program {
   video_badge_text?: string | null;
   /** ジャンル種別（genre_types.id を参照） */
   genre_type?: string | null;
-  /** フロントのシリーズ棚に表示するか。false だと棚に出さない */
+  /** トップページのシリーズ棚・トップ棚に載せるか。false だとトップの棚対象から外れる */
   show_on_front?: boolean;
+  /** マイページ等サイドバーの「コンテンツ」メニューに出すか */
+  show_in_sidebar?: boolean;
 }
 
 export interface Slide {

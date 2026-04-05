@@ -76,6 +76,7 @@ interface Program {
   video_badge_text?: string | null;
   genre_type: string | null;
   show_on_front?: boolean;
+  show_in_sidebar?: boolean;
 }
 
 export default function AdminPage() {
@@ -133,6 +134,7 @@ export default function AdminPage() {
     video_badge_bg: "#f59e0b",
     video_badge_text: "#ffffff",
     show_on_front: true,
+    show_in_sidebar: true,
   });
   const [savingProgram, setSavingProgram] = useState(false);
 
@@ -709,6 +711,7 @@ export default function AdminPage() {
           video_badge_bg: null,
           video_badge_text: null,
           show_on_front: true,
+          show_in_sidebar: true,
         })
         .select("id, name")
         .single();
@@ -1045,7 +1048,7 @@ export default function AdminPage() {
   async function loadPrograms() {
     const { data } = await supabase
       .from("programs")
-      .select("id, name, slug, description, started_year, shelf_badge_label, slide_badge_label, slide_badge_bg, slide_badge_text, video_badge_label, video_badge_bg, video_badge_text, genre_type, show_on_front")
+      .select("id, name, slug, description, started_year, shelf_badge_label, slide_badge_label, slide_badge_bg, slide_badge_text, video_badge_label, video_badge_bg, video_badge_text, genre_type, show_on_front, show_in_sidebar")
       .order("started_year", { ascending: true, nullsFirst: false });
     setPrograms((data ?? []) as Program[]);
   }
@@ -1165,6 +1168,7 @@ export default function AdminPage() {
         video_badge_bg: programForm.video_badge_label.trim() ? programForm.video_badge_bg : null,
         video_badge_text: programForm.video_badge_label.trim() ? programForm.video_badge_text : null,
         show_on_front: programForm.show_on_front,
+        show_in_sidebar: programForm.show_in_sidebar,
       });
       if (error) throw error;
       setCreatingProgram(false);
@@ -1181,6 +1185,7 @@ export default function AdminPage() {
         video_badge_bg: "#f59e0b",
         video_badge_text: "#ffffff",
         show_on_front: true,
+        show_in_sidebar: true,
       });
       loadPrograms();
     } catch (err) {
@@ -1376,6 +1381,7 @@ export default function AdminPage() {
           video_badge_bg: programForm.video_badge_label.trim() ? programForm.video_badge_bg : null,
           video_badge_text: programForm.video_badge_label.trim() ? programForm.video_badge_text : null,
           show_on_front: programForm.show_on_front,
+          show_in_sidebar: programForm.show_in_sidebar,
         })
         .eq("id", editingProgram.id);
       if (error) throw error;
@@ -1393,6 +1399,7 @@ export default function AdminPage() {
         video_badge_bg: "#f59e0b",
         video_badge_text: "#ffffff",
         show_on_front: true,
+        show_in_sidebar: true,
       });
       loadPrograms();
     } catch (err) {
@@ -2075,6 +2082,7 @@ export default function AdminPage() {
                   video_badge_bg: "#f59e0b",
                   video_badge_text: "#ffffff",
                   show_on_front: true,
+                  show_in_sidebar: true,
                 });
               }}
               className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
@@ -2083,7 +2091,7 @@ export default function AdminPage() {
             </button>
           </div>
           <p className="mb-4 text-sm text-neutral-600">
-            プログラム（ROCKET ABL 等）、組織（SPACE・EARTH 等）、自治体（鎌倉市等）を登録できます。スライド作成時に選択します。
+            プログラム（ROCKET ABL 等）、組織（SPACE・EARTH 等）、自治体（鎌倉市等）を登録できます。スライド作成時に選択します。「トップ棚」と「サイドバー」は独立しています（トップにだけ出し、メニューには出さない、などが可能です）。
           </p>
           <div className="overflow-hidden rounded-lg border border-neutral-200">
             <table className="w-full text-left text-sm">
@@ -2093,7 +2101,8 @@ export default function AdminPage() {
                   <th className="px-4 py-3 font-medium text-neutral-700">slug</th>
                   <th className="px-4 py-3 font-medium text-neutral-700">種別</th>
                   <th className="px-4 py-3 font-medium text-neutral-700">開始年</th>
-                  <th className="px-4 py-3 font-medium text-neutral-700">シリーズ表示</th>
+                  <th className="px-4 py-3 font-medium text-neutral-700">トップ棚</th>
+                  <th className="px-4 py-3 font-medium text-neutral-700">サイドバー</th>
                   <th className="w-24 px-4 py-3 font-medium text-neutral-700">操作</th>
                 </tr>
               </thead>
@@ -2107,6 +2116,7 @@ export default function AdminPage() {
                     </td>
                     <td className="px-4 py-3 text-neutral-600">{p.started_year ?? "—"}</td>
                     <td className="px-4 py-3 text-neutral-600">{p.show_on_front !== false ? "する" : "しない"}</td>
+                    <td className="px-4 py-3 text-neutral-600">{p.show_in_sidebar !== false ? "する" : "しない"}</td>
                     <td className="px-4 py-3">
                       <button
                         type="button"
@@ -2126,6 +2136,7 @@ export default function AdminPage() {
                             video_badge_bg: p.video_badge_bg ?? "#f59e0b",
                             video_badge_text: p.video_badge_text ?? "#ffffff",
                             show_on_front: p.show_on_front !== false,
+                            show_in_sidebar: p.show_in_sidebar !== false,
                           });
                         }}
                         className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
@@ -2262,7 +2273,21 @@ export default function AdminPage() {
                   className="h-4 w-4 rounded border-neutral-300"
                 />
                 <label htmlFor="show_on_front_new" className="text-xs font-medium text-neutral-600">
-                  フロントのシリーズ棚に表示する
+                  トップページのシリーズ棚に表示する
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="show_in_sidebar_new"
+                  checked={programForm.show_in_sidebar}
+                  onChange={(e) =>
+                    setProgramForm((f) => ({ ...f, show_in_sidebar: e.target.checked }))
+                  }
+                  className="h-4 w-4 rounded border-neutral-300"
+                />
+                <label htmlFor="show_in_sidebar_new" className="text-xs font-medium text-neutral-600">
+                  マイページ等のサイドバー「コンテンツ」メニューに表示する
                 </label>
               </div>
               <div className="flex gap-2">
@@ -2290,6 +2315,7 @@ export default function AdminPage() {
                       video_badge_bg: "#f59e0b",
                       video_badge_text: "#ffffff",
                       show_on_front: true,
+                      show_in_sidebar: true,
                     });
                   }}
                   className="rounded border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
@@ -2429,7 +2455,21 @@ export default function AdminPage() {
                       className="h-4 w-4 rounded border-neutral-300"
                     />
                     <label htmlFor="show_on_front_edit" className="text-sm font-medium text-neutral-600">
-                      フロントのシリーズ棚に表示する
+                      トップページのシリーズ棚に表示する
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="show_in_sidebar_edit"
+                      checked={programForm.show_in_sidebar}
+                      onChange={(e) =>
+                        setProgramForm((f) => ({ ...f, show_in_sidebar: e.target.checked }))
+                      }
+                      className="h-4 w-4 rounded border-neutral-300"
+                    />
+                    <label htmlFor="show_in_sidebar_edit" className="text-sm font-medium text-neutral-600">
+                      マイページ等のサイドバー「コンテンツ」メニューに表示する
                     </label>
                   </div>
                   <div className="flex justify-end gap-2">

@@ -9,7 +9,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("programs")
     .select("id, name, slug, genre_type")
-    .or("show_on_front.is.null,show_on_front.eq.true")
+    .or("show_in_sidebar.is.null,show_in_sidebar.eq.true")
     .order("started_year", { ascending: true, nullsFirst: false });
 
   if (error) {
