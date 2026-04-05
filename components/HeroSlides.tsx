@@ -8,8 +8,19 @@ const SLIDE_DURATION = 5500;
 const TRANSITION_MS = 600;
 const MOBILE_BREAKPOINT = 768;
 
+export type HeroCarouselItem =
+  | { kind: "slide"; slide: Slide }
+  | {
+      kind: "video";
+      id: string;
+      title: string;
+      thumbnailUrl: string | null;
+      href: string;
+      openInNewTab: boolean;
+    };
+
 interface HeroSlidesProps {
-  slides: Slide[];
+  items: HeroCarouselItem[];
   intervalMs?: number;
 }
 
@@ -25,28 +36,27 @@ function useIsMobile() {
   return isMobile;
 }
 
-export function HeroSlides({ slides, intervalMs = SLIDE_DURATION }: HeroSlidesProps) {
+export function HeroSlides({ items, intervalMs = SLIDE_DURATION }: HeroSlidesProps) {
   const isMobile = useIsMobile();
   const [index, setIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
-  const totalSlides = slides.length;
+  const total = items.length;
 
-  const extendedSlides = totalSlides > 0 ? [...slides, ...slides, ...slides] : [];
-  const offset = totalSlides;
-  // モバイル: 1枚幅いっぱい / PC: 3枚並び
-  const slideWidthPercent = totalSlides > 0 ? (isMobile ? 100 : 100 / 3) : 0;
+  const extended = total > 0 ? [...items, ...items, ...items] : [];
+  const offset = total;
+  const slideWidthPercent = total > 0 ? (isMobile ? 100 : 100 / 3) : 0;
 
   useEffect(() => {
-    if (totalSlides <= 1) return;
+    if (total <= 1) return;
     const timer = setInterval(() => {
       setIndex((prev) => prev + 1);
     }, intervalMs);
     return () => clearInterval(timer);
-  }, [totalSlides, intervalMs]);
+  }, [total, intervalMs]);
 
   useEffect(() => {
-    if (totalSlides <= 1) return;
-    if (index >= totalSlides) {
+    if (total <= 1) return;
+    if (index >= total) {
       const timeout = setTimeout(() => {
         setIsTransitioning(false);
         setIndex(0);
@@ -58,21 +68,21 @@ export function HeroSlides({ slides, intervalMs = SLIDE_DURATION }: HeroSlidesPr
       }, TRANSITION_MS);
       return () => clearTimeout(timeout);
     }
-  }, [index, totalSlides]);
+  }, [index, total]);
 
   const goPrev = () => {
-    if (totalSlides <= 1) return;
+    if (total <= 1) return;
     setIsTransitioning(true);
-    setIndex((prev) => (prev - 1 + totalSlides) % totalSlides);
+    setIndex((prev) => (prev - 1 + total) % total);
   };
 
   const goNext = () => {
-    if (totalSlides <= 1) return;
+    if (total <= 1) return;
     setIsTransitioning(true);
-    setIndex((prev) => (prev + 1) % totalSlides);
+    setIndex((prev) => (prev + 1) % total);
   };
 
-  if (totalSlides === 0) return null;
+  if (total === 0) return null;
 
   const translateX = -((offset + index) * slideWidthPercent);
 
@@ -80,12 +90,98 @@ export function HeroSlides({ slides, intervalMs = SLIDE_DURATION }: HeroSlidesPr
     "flex h-12 w-12 shrink-0 items-center justify-center transition hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent";
   const navButtonStyle = { color: "var(--fg)" };
 
+  function renderCard(item: HeroCarouselItem, i: number) {
+    const isCenter = isMobile ? i === offset + index : i === offset + index + 1;
+    const inner = (
+      <div
+        className={`h-full w-full overflow-hidden ${isMobile ? "rounded-none" : "rounded-lg"}`}
+        style={{
+          transform: isCenter ? "scale(1)" : "scale(0.9)",
+          opacity: isCenter ? 1 : 0.8,
+          transition: `transform ${TRANSITION_MS}ms cubic-bezier(0.33, 0, 0.2, 1)`,
+        }}
+      >
+        {item.kind === "slide" ? (
+          (() => {
+            const slide = item.slide;
+            const thumb = slide.image_url ?? slide.page_image_urls?.[0];
+            return thumb ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={thumb}
+                alt={slide.title}
+                className="h-full w-full object-cover object-center"
+              />
+            ) : (
+              <div
+                className="flex h-full w-full items-center justify-center"
+                style={{ background: "var(--card-hover)", color: "var(--fg-muted)" }}
+              >
+                <span className="text-sm">画像なし</span>
+              </div>
+            );
+          })()
+        ) : item.thumbnailUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={item.thumbnailUrl}
+            alt={item.title}
+            className="h-full w-full object-cover object-center"
+          />
+        ) : (
+          <div
+            className="flex h-full w-full flex-col items-center justify-center gap-1"
+            style={{ background: "var(--card-hover)", color: "var(--fg-muted)" }}
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-white/90">Video</span>
+            <span className="line-clamp-2 px-2 text-center text-sm">{item.title}</span>
+          </div>
+        )}
+      </div>
+    );
+
+    const wrapClass = `flex shrink-0 items-center justify-center overflow-hidden ${isMobile ? "px-0" : "px-1"}`;
+
+    if (item.kind === "slide") {
+      return (
+        <Link
+          key={`slide-${item.slide.id}-${i}`}
+          href={`/slide/${item.slide.id}`}
+          className={wrapClass}
+          style={{ width: `${slideWidthPercent}%` }}
+        >
+          {inner}
+        </Link>
+      );
+    }
+
+    if (item.openInNewTab) {
+      return (
+        <a
+          key={`video-${item.id}-${i}`}
+          href={item.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={wrapClass}
+          style={{ width: `${slideWidthPercent}%` }}
+        >
+          {inner}
+        </a>
+      );
+    }
+
+    return (
+      <Link key={`video-${item.id}-${i}`} href={item.href} className={wrapClass} style={{ width: `${slideWidthPercent}%` }}>
+        {inner}
+      </Link>
+    );
+  }
+
   return (
     <section
       className="relative overflow-hidden rounded-none px-3 md:rounded-xl md:px-0"
-      aria-label="おすすめスライド"
+      aria-label="おすすめコンテンツ"
     >
-      {/* スライド表示エリア（幅いっぱい） */}
       <div className="relative h-[min(50vh,320px)] w-full overflow-hidden sm:h-[min(50vh,360px)] md:h-[min(50vh,360px)]">
         <div
           className="flex h-full items-center"
@@ -97,55 +193,18 @@ export function HeroSlides({ slides, intervalMs = SLIDE_DURATION }: HeroSlidesPr
             willChange: "transform",
           }}
         >
-          {extendedSlides.map((slide, i) => {
-            const thumb = slide.image_url ?? slide.page_image_urls?.[0];
-            const isCenter = isMobile ? i === offset + index : i === offset + index + 1;
-            return (
-              <Link
-                key={`${slide.id}-${i}`}
-                href={`/slide/${slide.id}`}
-                className={`flex shrink-0 items-center justify-center overflow-hidden ${isMobile ? "px-0" : "px-1"}`}
-                style={{ width: `${slideWidthPercent}%` }}
-              >
-                <div
-                  className={`h-full w-full overflow-hidden ${isMobile ? "rounded-none" : "rounded-lg"}`}
-                  style={{
-                    transform: isCenter ? "scale(1)" : "scale(0.9)",
-                    opacity: isCenter ? 1 : 0.8,
-                    transition: `transform ${TRANSITION_MS}ms cubic-bezier(0.33, 0, 0.2, 1)`,
-                  }}
-                >
-                  {thumb ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={thumb}
-                      alt={slide.title}
-                      className="h-full w-full object-cover object-center"
-                    />
-                  ) : (
-                    <div
-                      className="flex h-full w-full items-center justify-center"
-                      style={{ background: "var(--card-hover)", color: "var(--fg-muted)" }}
-                    >
-                      <span className="text-sm">画像なし</span>
-                    </div>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
+          {extended.map((item, i) => renderCard(item, i))}
         </div>
       </div>
 
-      {/* サムネイルの上に重ねて表示（丸なしなので邪魔になりにくい） */}
-      {totalSlides > 1 && (
+      {total > 1 && (
         <>
           <button
             type="button"
             onClick={goPrev}
             className={`absolute left-2 top-1/2 z-10 -translate-y-1/2 md:left-3 ${navButtonClass}`}
             style={navButtonStyle}
-            aria-label="前のスライド"
+            aria-label="前へ"
           >
             <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -156,7 +215,7 @@ export function HeroSlides({ slides, intervalMs = SLIDE_DURATION }: HeroSlidesPr
             onClick={goNext}
             className={`absolute right-2 top-1/2 z-10 -translate-y-1/2 md:right-3 ${navButtonClass}`}
             style={navButtonStyle}
-            aria-label="次のスライド"
+            aria-label="次へ"
           >
             <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -165,9 +224,9 @@ export function HeroSlides({ slides, intervalMs = SLIDE_DURATION }: HeroSlidesPr
         </>
       )}
 
-      {totalSlides > 1 && (
+      {total > 1 && (
         <div className="absolute bottom-1 left-1/2 z-10 flex -translate-x-1/2 gap-1.5">
-          {slides.map((_, i) => (
+          {items.map((_, i) => (
             <button
               key={i}
               type="button"
@@ -178,10 +237,10 @@ export function HeroSlides({ slides, intervalMs = SLIDE_DURATION }: HeroSlidesPr
               }}
               className="h-1.5 rounded-full transition-all"
               style={{
-                width: i === index % totalSlides ? 24 : 6,
-                background: i === index % totalSlides ? "var(--fg)" : "var(--fg-muted)",
+                width: i === index % total ? 24 : 6,
+                background: i === index % total ? "var(--fg)" : "var(--fg-muted)",
               }}
-              aria-label={`スライド ${i + 1} を表示`}
+              aria-label={`${i + 1} 枚目を表示`}
             />
           ))}
         </div>

@@ -8,6 +8,13 @@ import { KeywordTagInput } from "@/components/KeywordTagInput";
 import { AnnouncementMarkdown } from "@/components/AnnouncementMarkdown";
 import { extractYoutubeVideoId } from "@/lib/youtube";
 import { isValidHttpUrl } from "@/lib/external-url";
+import {
+  formatHeroSlideEntry,
+  formatHeroVideoEntry,
+  heroSelectionIncludesSlide,
+  heroSelectionIncludesVideo,
+  parseHeroSettingEntry,
+} from "@/lib/hero-carousel";
 
 type SlideVisibility = "free" | "invite_only" | "private";
 type ContentTier = "basic" | "pro" | "advance";
@@ -1987,7 +1994,7 @@ export default function AdminPage() {
               />
             </div>
             <div className="space-y-4 border-t border-neutral-200 pt-4">
-              <h3 className="text-sm font-semibold text-neutral-800">ヒーローカルーセル（トップのスライド表示）</h3>
+              <h3 className="text-sm font-semibold text-neutral-800">ヒーローカルーセル（トップのスライド・動画）</h3>
               <div className="flex flex-wrap gap-6">
                 <label className="flex items-center gap-2">
                   <input
@@ -2013,6 +2020,9 @@ export default function AdminPage() {
               {heroMode === "random" && (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-neutral-700">表示枚数（1〜20）</label>
+                  <p className="mb-2 text-xs text-neutral-500">
+                    公開中のスライドと動画をまとめてシャッフルし、先頭から指定枚数だけ表示します。
+                  </p>
                   <input
                     type="number"
                     min={1}
@@ -2025,39 +2035,70 @@ export default function AdminPage() {
               )}
               {heroMode === "selected" && (
                 <div>
-                  <p className="mb-2 text-sm text-neutral-600">表示するスライドを選んでください（上から表示順）。</p>
+                  <p className="mb-2 text-sm text-neutral-600">表示するスライドと動画を選んでください（上から表示順）。</p>
                   <div className="mb-2 flex flex-wrap gap-2">
                     <select
                       value=""
                       onChange={(e) => {
                         const id = e.target.value;
-                        if (id && !heroSlideIds.includes(id)) setHeroSlideIds((prev) => [...prev, id]);
+                        if (id && !heroSelectionIncludesSlide(heroSlideIds, id)) {
+                          setHeroSlideIds((prev) => [...prev, formatHeroSlideEntry(id)]);
+                        }
                         e.target.value = "";
                       }}
                       className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"
                     >
                       <option value="">スライドを追加…</option>
                       {slides
-                        .filter((s) => !heroSlideIds.includes(s.id))
+                        .filter((s) => !heroSelectionIncludesSlide(heroSlideIds, s.id))
                         .map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.title} ({String(s.id ?? "").slice(0, 8)}…)
                           </option>
                         ))}
                     </select>
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        if (id && !heroSelectionIncludesVideo(heroSlideIds, id)) {
+                          setHeroSlideIds((prev) => [...prev, formatHeroVideoEntry(id)]);
+                        }
+                        e.target.value = "";
+                      }}
+                      className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"
+                    >
+                      <option value="">動画を追加…</option>
+                      {videos
+                        .filter((v) => !heroSelectionIncludesVideo(heroSlideIds, v.id))
+                        .map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.title} ({String(v.id ?? "").slice(0, 8)}…)
+                          </option>
+                        ))}
+                    </select>
                   </div>
-                  <ul className="space-y-1 rounded border border-neutral-200 bg-neutral-50 p-2 max-h-48 overflow-y-auto">
+                  <ul className="max-h-48 space-y-1 overflow-y-auto rounded border border-neutral-200 bg-neutral-50 p-2">
                     {heroSlideIds.length === 0 ? (
                       <li className="text-sm text-neutral-500">まだ選択されていません</li>
                     ) : (
-                      heroSlideIds.map((id) => {
-                        const slide = slides.find((s) => s.id === id);
+                      heroSlideIds.map((entry) => {
+                        const parsed = parseHeroSettingEntry(entry);
+                        const slide = parsed?.kind === "slide" ? slides.find((s) => s.id === parsed.id) : null;
+                        const video = parsed?.kind === "video" ? videos.find((v) => v.id === parsed.id) : null;
+                        const title = slide?.title ?? video?.title ?? entry;
+                        const kindLabel = parsed?.kind === "video" ? "動画" : "スライド";
                         return (
-                          <li key={id} className="flex items-center justify-between gap-2 rounded px-2 py-1 text-sm">
-                            <span className="min-w-0 truncate text-neutral-800">{slide?.title ?? id}</span>
+                          <li key={entry} className="flex items-center justify-between gap-2 rounded px-2 py-1 text-sm">
+                            <span className="min-w-0 truncate text-neutral-800">
+                              <span className="mr-2 rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-medium text-neutral-700">
+                                {kindLabel}
+                              </span>
+                              {title}
+                            </span>
                             <button
                               type="button"
-                              onClick={() => setHeroSlideIds((prev) => prev.filter((x) => x !== id))}
+                              onClick={() => setHeroSlideIds((prev) => prev.filter((x) => x !== entry))}
                               className="shrink-0 rounded border border-neutral-300 bg-white px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100"
                             >
                               削除

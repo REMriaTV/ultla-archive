@@ -4,7 +4,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ExpandedSlideProvider } from "@/components/ExpandedSlideContext";
 import { HomeAnnouncementCards } from "@/components/HomeAnnouncementCards";
 import { GuestBanner } from "@/components/GuestBanner";
-import { HeroSlides } from "@/components/HeroSlides";
+import { HeroSlides, type HeroCarouselItem } from "@/components/HeroSlides";
+import { parseHeroSettingEntry } from "@/lib/hero-carousel";
 import { CuratedShelf, InviteSeriesShelf, MylistShelf, ProgramShelf, VideoSeriesShelf, type CuratedShelfItem, type VideoShelfItem } from "@/components/ProgramShelf";
 import { SearchSection } from "@/components/SearchSection";
 import { getAccessContext, filterVisibleSlides, canViewVideo } from "@/lib/access";
@@ -27,6 +28,27 @@ function curatedVideoHref(video: HomeVideoRow): { href: string; external: boolea
   if (ytId) return { href: `/video/${video.id}`, external: false };
   if (isValidHttpUrl(ext)) return { href: ext, external: true };
   return { href: `/video/${video.id}`, external: false };
+}
+
+function videoHeroThumbnailUrl(v: HomeVideoRow & { thumbnail_url?: string | null }): string | null {
+  if (v.thumbnail_url?.trim()) return v.thumbnail_url.trim();
+  const ytId =
+    (v.youtube_url && extractYoutubeVideoId(v.youtube_url)) ||
+    (v.youtube_video_id?.trim() ? v.youtube_video_id.trim() : null);
+  if (ytId) return `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`;
+  return null;
+}
+
+function videoToHeroItem(v: HomeVideoRow & { id: string; title: string }): HeroCarouselItem {
+  const { href, external } = curatedVideoHref(v);
+  return {
+    kind: "video",
+    id: String(v.id),
+    title: v.title,
+    thumbnailUrl: videoHeroThumbnailUrl(v),
+    href,
+    openInNewTab: external,
+  };
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -125,10 +147,6 @@ export default async function Home(props: HomeProps) {
   const slidesList = filterVisibleSlides(rawSlides, accessCtx);
 
   const slidesById = new Map(slidesList.map((s) => [String(s.id), s]));
-  const heroSlides =
-    heroMode === "selected" && heroSlideIds.length > 0
-      ? heroSlideIds.map((id) => slidesById.get(id)).filter(Boolean) as Slide[]
-      : shuffle(slidesList).slice(0, heroSlideCount);
 
   const slidesByProgram = new Map<string, Slide[]>();
   for (const slide of slidesList) {
@@ -153,6 +171,29 @@ export default async function Home(props: HomeProps) {
   }>;
 
   const visibleVideos = rawVideos.filter((video) => canViewVideo(video, accessCtx));
+
+  const heroCarouselItems: HeroCarouselItem[] = (() => {
+    if (heroMode === "selected" && heroSlideIds.length > 0) {
+      const out: HeroCarouselItem[] = [];
+      const videoMap = new Map(visibleVideos.map((v) => [String(v.id), v]));
+      for (const raw of heroSlideIds) {
+        const parsed = parseHeroSettingEntry(raw);
+        if (!parsed) continue;
+        if (parsed.kind === "slide") {
+          const slide = slidesById.get(parsed.id);
+          if (slide) out.push({ kind: "slide", slide });
+        } else {
+          const v = videoMap.get(parsed.id);
+          if (v) out.push(videoToHeroItem(v));
+        }
+      }
+      return out;
+    }
+    const slideItems: HeroCarouselItem[] = slidesList.map((slide) => ({ kind: "slide" as const, slide }));
+    const videoItems: HeroCarouselItem[] = visibleVideos.map((v) => videoToHeroItem(v));
+    const pool = shuffle([...slideItems, ...videoItems]);
+    return pool.slice(0, heroSlideCount);
+  })();
 
   const videosByProgram = new Map<string, VideoShelfItem[]>();
   const visibleVideosById = new Map<string, (typeof rawVideos)[number]>();
@@ -355,7 +396,7 @@ export default async function Home(props: HomeProps) {
         />
         {/* ヒーロースライド（main の px を打ち消して幅いっぱいに） */}
         <section className="-mx-6 mb-6">
-          <HeroSlides slides={heroSlides} intervalMs={5500} />
+          <HeroSlides items={heroCarouselItems} intervalMs={5500} />
         </section>
 
         {/* 検索セクション（ヘッダー検索から ?q= で来た場合は初期値＋自動検索） */}
